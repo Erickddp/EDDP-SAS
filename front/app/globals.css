@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors based on requirements */
+  --color-bg-main: #05070B;
+  --color-bg-sec: #08111F;
+  --color-bg-card: rgba(8, 17, 31, 0.72);
+  
+  --color-cyan-main: #20C4FF;
+  --color-cyan-glow: #53D3FF;
+  
+  --color-text-main: #F5F7FA;
+  --color-text-sec: #A9B4C2;
+  
+  --color-border-glow: rgba(83, 211, 255, 0.18);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg-main);
+    color: var(--color-text-main);
+    min-height: 100vh;
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  /* Premium glassmorphism card */
+  .glass-card {
+    background-color: var(--color-bg-card);
+    border: 1px solid var(--color-border-glow);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 1rem;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Text glow */
+  .glow-text {
+    color: var(--color-cyan-main);
+    text-shadow: 0 0 10px rgba(83, 211, 255, 0.5);
+  }
+
+  /* Custom scrollbar for webkit */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg-main);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border-glow);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-cyan-glow);
+  }
+}
