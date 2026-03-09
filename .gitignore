@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+front/node_modules/
+back/node_modules/
+
+# Build outputs
+.next/
+front/.next/
+back/.next/
+out/
+dist/
+build/
+coverage/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE / OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
