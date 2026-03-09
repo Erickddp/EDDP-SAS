@@ -31,3 +31,6 @@ pnpm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
+
+# Local backups
+front/.git_nested_backup/
