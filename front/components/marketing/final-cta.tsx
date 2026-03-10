@@ -3,6 +3,8 @@
 import { motion } from "framer-motion";
 import { Container } from "../layout/container";
 import { Button } from "../ui/button";
+import Link from "next/link";
+import { guestLogin } from "@/lib/auth";
 
 export function FinalCTA() {
     return (
@@ -22,14 +24,23 @@ export function FinalCTA() {
                     className="mx-auto max-w-3xl rounded-3xl border border-border-glow bg-bg-sec/50 p-8 shadow-2xl backdrop-blur-md md:p-16"
                 >
                     <h2 className="mb-6 text-3xl font-extrabold tracking-tight text-text-main md:text-5xl">
-                        La consulta fiscal no debería sentirse inaccesible.
+                        Toma el control de tus <span className="text-cyan-main">consultas fiscales</span> hoy mismo.
                     </h2>
                     <p className="mb-10 text-lg text-text-sec md:text-xl">
-                        MyFiscal busca acercar información útil, clara y profesional a más personas.
+                        Únete a los contadores y empresas que ya están ahorrando tiempo y ganando seguridad jurídica con MyFiscal.
                     </p>
-                    <Button size="lg" variant="primary" className="w-full sm:w-auto text-lg px-10 h-14">
-                        Unirme a la lista
-                    </Button>
+                    <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
+                        <form action={guestLogin}>
+                            <Button size="lg" variant="primary" type="submit" className="w-full sm:w-auto text-lg px-10 h-14">
+                                Probar Gratis como Invitado
+                            </Button>
+                        </form>
+                        <Link href="/register">
+                            <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg px-10 h-14 border-cyan-main/30 text-cyan-main">
+                                Crear Cuenta Pro
+                            </Button>
+                        </Link>
+                    </div>
                 </motion.div>
             </Container>
         </section>

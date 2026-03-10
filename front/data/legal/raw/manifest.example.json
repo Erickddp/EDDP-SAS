@@ -1,0 +1,24 @@
+[
+  {
+    "id": "01",
+    "filename": "01.txt",
+    "documentName": "Constitución Política de los Estados Unidos Mexicanos",
+    "abbreviation": "CPEUM",
+    "category": "constitucional",
+    "sourceType": "texto legal",
+    "officialSource": "DOF / Cámara de Diputados",
+    "status": "vigente",
+    "notes": "Texto base constitucional"
+  },
+  {
+    "id": "02",
+    "filename": "02.txt",
+    "documentName": "Ley del Impuesto sobre la Renta",
+    "abbreviation": "LISR",
+    "category": "fiscal",
+    "sourceType": "texto legal",
+    "officialSource": "DOF / Cámara de Diputados",
+    "status": "vigente",
+    "notes": "Ley fiscal principal de ISR"
+  }
+]

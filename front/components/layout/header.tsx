@@ -7,8 +7,9 @@ import { Container } from "./container";
 import { Button } from "../ui/button";
 import { MobileMenu } from "./mobile-menu";
 import { cn } from "@/lib/utils";
+import { logout } from "@/lib/auth";
 
-export function Header() {
+export function Header({ user }: { user?: any }) {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -45,18 +46,42 @@ export function Header() {
 
                         {/* Desktop Nav */}
                         <nav className="hidden items-center space-x-8 md:flex">
-                            <Link href="#como-funciona" className="text-sm font-medium text-text-sec transition-colors hover:text-cyan-main">
+                            <Link href="/#como-funciona" className="text-sm font-medium text-text-sec transition-colors hover:text-cyan-main">
                                 Cómo funciona
                             </Link>
-                            <Link href="#precios" className="text-sm font-medium text-text-sec transition-colors hover:text-cyan-main">
+                            <Link href="/#precios" className="text-sm font-medium text-text-sec transition-colors hover:text-cyan-main">
                                 Precios
                             </Link>
-                            <Link href="/demo" className="text-sm font-medium text-text-sec transition-colors hover:text-cyan-main">
-                                Demo
-                            </Link>
-                            <Button variant="outline" size="sm" className="ml-4">
-                                Entrar
-                            </Button>
+                            {user ? (
+                                <div className="flex items-center gap-4 ml-4">
+                                    <span className="text-sm text-text-sec">
+                                        {user.role === 'guest' ? 'Modo Invitado' : user.name}
+                                    </span>
+                                    <Link href="/chat">
+                                        <Button variant="outline" size="sm">
+                                            Ir al Chat
+                                        </Button>
+                                    </Link>
+                                    <form action={logout}>
+                                        <Button variant="ghost" size="sm" type="submit" className="text-red-400 hover:text-red-300 hover:bg-red-950/30">
+                                            Salir
+                                        </Button>
+                                    </form>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 ml-4">
+                                    <Link href="/login">
+                                        <Button variant="ghost" size="sm">
+                                            Entrar
+                                        </Button>
+                                    </Link>
+                                    <Link href="/register">
+                                        <Button variant="outline" size="sm">
+                                            Registrarse
+                                        </Button>
+                                    </Link>
+                                </div>
+                            )}
                         </nav>
 
                         {/* Mobile Nav Toggle */}

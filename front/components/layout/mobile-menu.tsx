@@ -57,11 +57,11 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
                                 Precios
                             </Link>
                             <Link
-                                href="/demo"
+                                href="/chat"
                                 className="text-lg font-medium text-text-sec transition-colors hover:text-cyan-main"
                                 onClick={onClose}
                             >
-                                Demo
+                                Chat
                             </Link>
                             <div className="h-px w-full bg-border-glow" />
                             <Button variant="primary" className="w-full" onClick={onClose}>

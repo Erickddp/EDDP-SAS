@@ -7,48 +7,88 @@ import { Button } from "../ui/button";
 import { SectionTitle } from "../ui/section-title";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { guestLogin } from "@/lib/auth";
 
 export function PricingPreview() {
     const plans = [
         {
-            name: "Beta",
+            name: "Invitado",
             price: "Gratis",
-            context: "Por tiempo limitado",
-            description: "Acceso temprano con funciones básicas.",
-            features: ["Consultas casuales", "Respuestas simples", "1 usuario", "Soporte comunitario"],
+            context: "Sin registro",
+            description: "Prueba la potencia del buscador de forma limitada.",
+            features: [
+                "3 consultas diarias",
+                "Respuestas básicas",
+                "Acceso a leyes principales",
+                "Sin historial",
+            ],
             highlight: false,
             delay: 0.1,
+            buttonText: "Probar ahora",
+            href: "/chat",
         },
         {
             name: "Básico",
             price: "$149",
             context: "MXN / mes",
             description: "Para pequeños negocios y dueños.",
-            features: ["Consultas detalladas", "Fuentes legales", "Exportar a PDF", "Historial de 30 días"],
+            features: [
+                "Consultas detalladas",
+                "Fuentes legales completas",
+                "Exportar a PDF",
+                "Historial de 30 días",
+            ],
             highlight: true,
             delay: 0.2,
+            buttonText: "Crear cuenta",
+            href: "/register",
         },
         {
             name: "Pro",
             price: "$349",
             context: "MXN / mes",
             description: "Despachos y profesionales fiscales.",
-            features: ["Consultas técnicas", "Análisis de jurisprudencia", "Historial ilimitado", "Soporte prioritario"],
+            features: [
+                "Consultas técnicas avanzadas",
+                "Análisis de jurisprudencia",
+                "Historial ilimitado",
+                "Soporte prioritario",
+            ],
             highlight: false,
             delay: 0.3,
+            buttonText: "Comenzar Pro",
+            href: "/register",
+        },
+        {
+            name: "Despacho",
+            price: "Personalizado",
+            context: "Anual o mensual",
+            description: "Soluciones a medida para firmas grandes.",
+            features: [
+                "Múltiples usuarios",
+                "Análisis masivo de documentos",
+                "API de integración",
+                "Account Manager dedicado",
+            ],
+            highlight: false,
+            delay: 0.4,
+            buttonText: "Contactar",
+            href: "/register", // Or a contact form
         },
     ];
 
     return (
-        <section id="precios" className="relative py-20 md:py-28">
-            <Container>
+        <section id="precios" className="relative py-20 md:py-28 overflow-hidden">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-cyan-main/5 blur-[120px] pointer-events-none" />
+            <Container className="relative z-10">
                 <SectionTitle
                     title="Planes de acceso"
-                    subtitle="Precios preliminares sujetos a lanzamiento. Únete a la lista de espera para asegurar tu lugar en la beta."
+                    subtitle="Selecciona el nivel de profundidad y herramientas que tu operación requiere."
                     className="mb-16"
                 />
 
-                <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-3">
+                <div className="mx-auto grid max-w-7xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
                     {plans.map((plan, i) => (
                         <motion.div
                             key={i}
@@ -89,12 +129,26 @@ export function PricingPreview() {
                                     ))}
                                 </ul>
 
-                                <Button
-                                    variant={plan.highlight ? "primary" : "secondary"}
-                                    className={cn("w-full mt-auto", plan.highlight ? "" : "border-border-glow hover:border-cyan-main/50")}
-                                >
-                                    Seleccionar plan
-                                </Button>
+                                {plan.name === "Invitado" ? (
+                                    <form action={guestLogin} className="w-full mt-auto">
+                                        <Button
+                                            variant="secondary"
+                                            type="submit"
+                                            className="w-full border-border-glow hover:border-cyan-main/50"
+                                        >
+                                            {plan.buttonText}
+                                        </Button>
+                                    </form>
+                                ) : (
+                                    <Link href={plan.href} className="w-full mt-auto">
+                                        <Button
+                                            variant={plan.highlight ? "primary" : "secondary"}
+                                            className={cn("w-full", plan.highlight ? "" : "border-border-glow hover:border-cyan-main/50")}
+                                        >
+                                            {plan.buttonText}
+                                        </Button>
+                                    </Link>
+                                )}
                             </Card>
                         </motion.div>
                     ))}

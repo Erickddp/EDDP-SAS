@@ -1,0 +1,116 @@
+# Fase 9: RAG y PostgreSQL - Entregables
+
+Se ha creado la infraestructura base de almacenamiento vectorial utilizando PostgreSQL y `pgvector` para MyFiscal.
+
+## 1. Código Implementado
+- **[front/lib/db.ts](file:///c:/Users/erick/Desktop/new%20web/SASFiscal/front/lib/db.ts)**: Configuración de conexión con PostgreSQL y comandos de inicialización de tablas usando el paquete `pg`.
+- **[front/lib/embedding.ts](file:///c:/Users/erick/Desktop/new%20web/SASFiscal/front/lib/embedding.ts)**: Generación de embeddings utilizando el modelo `text-embedding-3-small` de OpenAI.
+- **[front/lib/vector-search.ts](file:///c:/Users/erick/Desktop/new%20web/SASFiscal/front/lib/vector-search.ts)**: Función [searchArticles(query, limit)](file:///c:/Users/erick/Desktop/new%20web/SASFiscal/front/lib/vector-search.ts#4-25) que recibe una pregunta, la vectoriza y calcula la similitud coseno (`<=>`) contra la tabla `article_embeddings`.
+- **[front/scripts/build-embeddings.ts](file:///c:/Users/erick/Desktop/new%20web/SASFiscal/front/scripts/build-embeddings.ts)**: Script de pipeline de datos que extrae los artículos de la Ley, los guarda como JSON en `data/legal/normalized/` y puebla la base de datos completa.
+- **[front/package.json](file:///c:/Users/erick/Desktop/new%20web/SASFiscal/front/package.json)**: Dependencias incluidas y script `npm run build:embeddings` creado.
+
+---
+
+## 2. Estructura SQL Implementada
+
+El esquema de base de datos se crea automáticamente al correr el script, y consta de las siguientes estructuras relacionales:
+
+```sql
+-- Habilita soporte para embeddings vectoriales
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE documents (
+    id VARCHAR(255) PRIMARY KEY,
+    name TEXT NOT NULL,
+    abbreviation VARCHAR(50),
+    category VARCHAR(100),
+    source TEXT,
+    version VARCHAR(50),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE articles (
+    id VARCHAR(255) PRIMARY KEY,
+    document_id VARCHAR(255) REFERENCES documents(id) ON DELETE CASCADE,
+    article_number VARCHAR(50) NOT NULL,
+    title TEXT,
+    text TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE article_embeddings (
+    id VARCHAR(255) PRIMARY KEY,
+    article_id VARCHAR(255) REFERENCES articles(id) ON DELETE CASCADE,
+    embedding vector(1536)
+);
+```
+
+---
+
+## 3. Instrucciones: Cómo Correr PostgreSQL Localmente
+
+Si no tienes PostgreSQL instalado, la manera más rápida y limpia de correr una base de datos con soporte para `pgvector` es mediante **Docker**.
+
+### Opción Recomendada (Usando Docker)
+Abre una terminal y ejecuta el siguiente comando:
+
+```bash
+docker run --name myfiscal-db \
+  -e POSTGRES_USER=user \
+  -e POSTGRES_PASSWORD=password \
+  -e POSTGRES_DB=myfiscal \
+  -p 5432:5432 \
+  -d pgvector/pgvector:pg16
+```
+
+### Opciones sin Docker
+Si deseas instalar PostgreSQL nativamente:
+1. Descarga [Postgres.app](https://postgresapp.com/) (Mac), instalar [PostgreSQL Desktop](https://www.postgresql.org/download/windows/) (Windows).
+2. Deberás instalar la extensión compilada `pgvector` de forma separada siguiendo [las instrucciones del repositorio de pgvector](https://github.com/pgvector/pgvector). (La versión de Docker ya lo trae configurado).
+
+### Conexión
+Asegúrate de que en el archivo [front/.env](file:///c:/Users/erick/Desktop/new%20web/SASFiscal/front/.env) se encuentre la URI de conexión establecida correctamente para este entorno local:
+```env
+DATABASE_URL="postgres://user:password@localhost:5432/myfiscal"
+```
+
+---
+
+## 4. Cómo Población la Base de Datos (Pipeline)
+
+Una vez que la base de datos PostgreSQL esté corriendo, procesa los archivos normativos ejecutando el comando que ha sido introducido:
+
+```bash
+cd front
+npm run build:embeddings
+```
+
+Este proceso leerá los archivos en `data/legal/normalized/`, insertará los objetos y llamará de forma asíncrona a la API de OpenAI para generar el vector para cada artículo insertado.
+
+*(Nota: Asegúrate también de contar con tu variable `OPENAI_API_KEY` disponible en tu entorno antes de iterar sobre el vectorizador).*
+
+---
+
+## 5. Ejemplo de Consulta Vectorial
+
+En el paso siguiente o cuando desees invocar una consulta semántica desde el Backend, la forma de uso prevista es invocar el archivo [vector-search.ts](file:///c:/Users/erick/Desktop/new%20web/SASFiscal/front/lib/vector-search.ts):
+
+```typescript
+import { searchArticles } from "@/lib/vector-search";
+
+async function testSearch() {
+  const userQuery = "¿Qué multas aplican si no presento mi declaración anual?";
+  
+  // Realiza la conversión a vector y busca los superiores 5 con coseno
+  const results = await searchArticles(userQuery, 5);
+  
+  results.forEach(res => {
+     console.log(`- Documento: ${res.document_name}`);
+     console.log(`  Artículo: ${res.article_number}`);
+     console.log(`  Similitud (0 a 1): ${res.similarity}`);
+     console.log(`  Texto: ${res.text.substring(0, 50)}...`);
+  });
+}
+```
+
+Todo ha sido implementado respetando la UI y la operabilidad actual del proyecto. El chat existente seguirá operando normalmente mientras esta nueva base se habilita para su reemplazo en el Step 10.

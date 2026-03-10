@@ -9,37 +9,37 @@ import { BookOpen, Scale, Clock, Users } from "lucide-react";
 export function Benefits() {
     const benefits = [
         {
-            title: "Respuestas más claras",
-            description: "Traduce la jerga legal a términos prácticos y de negocio, adaptando el nivel de profundidad a tu perfil.",
+            title: "Claridad Inmediata",
+            description: "Traduce la jerga legal compleja a términos prácticos de negocio sin perder el rigor técnico.",
             icon: BookOpen,
             delay: 0.1,
         },
         {
-            title: "Fundamento legal visible",
-            description: "Cada respuesta viene respaldada con precisión por la ley, código o reglamento vigente aplicable.",
+            title: "Fundamento Legal",
+            description: "Cada respuesta se construye sobre leyes, reglamentos y criterios vigentes, citando fuentes exactas.",
             icon: Scale,
             delay: 0.2,
         },
         {
-            title: "Ahorro de tiempo para despachos",
-            description: "Agiliza drásticamente tu investigación fiscal y encuentra el artículo exacto en segundos.",
+            title: "Rapidez Estratégica",
+            description: "Reduce horas de investigación a segundos. Encuentra el artículo preciso en el momento que lo necesitas.",
             icon: Clock,
             delay: 0.3,
         },
         {
-            title: "Acceso accesible para todos",
-            description: "Democratizando el conocimiento fiscal premium para emprendedores, PyMEs y contribuyentes.",
+            title: "Trazabilidad Total",
+            description: "Mantén un historial de tus consultas para revisiones futuras o para documentar criterios internos.",
             icon: Users,
             delay: 0.4,
         },
     ];
 
     return (
-        <section id="como-funciona" className="py-20 md:py-28 relative">
+        <section id="beneficios" className="py-20 md:py-28 relative">
             <Container>
                 <SectionTitle
-                    title="Diseñado para consultar mejor"
-                    subtitle="Una interfaz pensada para hacer preguntas reales, entender el fundamento y moverte más rápido entre obligaciones, artículos y criterios."
+                    title="Por qué elegir MyFiscal"
+                    subtitle="Diseñado exclusivamente para el ecosistema fiscal mexicano, uniendo tecnología de vanguardia con sustento normativo."
                     className="mb-16"
                 />
 

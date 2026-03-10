@@ -33,6 +33,12 @@ Ley de Ingresos de la Federación (LIF) y Ley Federal de Procedimiento Contencio
 
 La base se ampliará progresivamente con más de 50 códigos y leyes, pero la prioridad inicial es dominar el ámbito fiscal. Según la Cámara de Diputados, la última reforma de cada código se indica con su fecha en el DOF, lo que facilitará mantener versiones actualizadas.
 
+
+
+
+
+
+
 Arquitectura técnica recomendada
 1. Ingesta y normalización
 
@@ -181,540 +187,112 @@ Para avanzar hoy, se recomienda preparar la landing page con lista de espera, de
 
 
 
-CONSTRUCCION//
-
-1. VISIÓN GENERAL DEL SISTEMA
-
-MyFiscal es actualmente:
-
-Usuario
-   ↓
-Chat UI
-   ↓
-Chat API
-   ↓
-Motor de recuperación legal
-   ↓
-Contexto normativo
-   ↓
-Respuesta estructurada
-   ↓
-Visor de artículos
-
-Arquitectura actual:
-
-Frontend (Next.js + React)
-│
-├── ChatWindow
-│
-├── MessageBubble
-│
-├── SourceCard
-│
-└── ArticleViewer (drawer lateral)
-        ↓
-Backend (Next API Routes)
-│
-├── /api/chat
-│
-└── /api/articles/[id]
-        ↓
-Servicios internos
-│
-├── legal-search.ts
-├── law-reader.ts
-├── hybrid-retrieval.ts
-├── context-builder.ts
-├── legal-synonyms.ts
-│
-└── mock-engine.ts
-        ↓
-Dataset legal
-│
-└── laws.ts
-
-Esto ya es arquitectura de sistema serio.
-
-2. LO QUE YA ESTÁ BIEN CONSTRUIDO
-2.1 Dataset legal
-
-Archivo:
-
-lib/laws.ts
-
-Contiene:
-
-ALL_LAW_ARTICLES
-
-Cada artículo:
-
-{
- id
- documentName
- documentAbbreviation
- articleNumber
- title
- text
- keywords
-}
-
-Este dataset es el corazón del sistema.
-
-Todo depende de él.
-
-2.2 Motor de búsqueda legal
-
-Archivo:
-
-lib/legal-search.ts
-
-Funciones clave:
-
-normalizeQuery()
-tokenizeQuery()
-scoreArticle()
-searchArticles()
-inferLegalTopic()
-debugSearch()
-
-Lo que hace:
-
-query
- ↓
-normalización
- ↓
-tokens
- ↓
-scoring
- ↓
-ranking
- ↓
-top artículos
 
-Mejoras que ya implementaste:
 
-✔ regex para artículos
-✔ ranking por tema
-✔ frases clave
-✔ penalización de falsos positivos
-✔ prioridad de leyes
-✔ debugSearch()
-
-Esto está bien diseñado.
-
-2.3 Motor híbrido
-
-Archivos:
 
-lib/legal-synonyms.ts
-lib/hybrid-retrieval.ts
-lib/context-builder.ts
 
-Esto es arquitectura RAG inicial.
 
-Flujo:
 
-query
- ↓
-tokenize
- ↓
-expand synonyms
- ↓
-hybrid scoring
- ↓
-ranking
- ↓
-context builder
 
-Resultado:
 
-{
- topic
- retrievedArticles
- foundation
- sources
-}
 
-Esto es la base del sistema inteligente.
 
-2.4 API del chat
 
-Archivo:
 
-/api/chat/route.ts
 
-Flujo real:
 
-POST /api/chat
 
-mensaje usuario
-      ↓
-inferLegalTopic
-      ↓
-buildLegalContext
-      ↓
-MockEngine.processChat
-      ↓
-fusionar contexto + explicación
-      ↓
-ChatResponse
 
-Respuesta estructurada:
 
-{
- answer: {
-  summary
-  explanation
-  foundation
-  scenarios
-  consequences
-  certainty
-  disclaimer
- },
- sources: [],
- titleSuggestion
-}
 
-Esto está bien pensado.
 
-2.5 Visor de artículos
 
-Backend:
 
-lib/law-reader.ts
-/api/articles/[id]
 
-Frontend:
 
-ArticleViewer
 
-Flujo:
 
-Usuario
- ↓
-click "Ver artículo"
- ↓
-fetch /api/articles/id
- ↓
-drawer lateral
- ↓
-texto legal completo
 
-Esto es una gran decisión de UX.
 
-Da credibilidad.
 
-2.6 UI del chat
 
-Componentes:
 
-ChatWindow
-MessageBubble
-SourceCard
-ArticleViewer
 
-Flujo visual:
 
-Usuario pregunta
- ↓
-mensaje aparece
- ↓
-respuesta IA
- ↓
-fuentes consultadas
- ↓
-botón "Ver artículo"
 
-Esto ya parece producto real.
 
-3. LO QUE NO ESTÁ BIEN CONECTADO
+ya tiene
 
-Aquí está el problema que mencionaste.
 
-Botones que no hacen nada.
 
-Eso pasa cuando:
 
-UI existe
-pero
-no hay handler
 
-Probables casos:
 
-botón copiar
-botón guardar
-botón compartir
-botón feedback
-botón regenerar
 
-Es decir:
 
-UI
-✔
 
-Backend
-✘
 
-Eso no rompe la app, pero sí da sensación de producto incompleto.
+## 6. Arquitectura de acceso y producto
 
-4. PROBLEMAS ARQUITECTÓNICOS DETECTADOS
-4.1 MockEngine
+### Rutas públicas
+- `/` → Landing comercial de MyFiscal
+- `/login` → Inicio de sesión
+- `/register` → Registro
+- `/guest` → Acceso temporal invitado
 
-Archivo:
+### Ruta principal de producto
+- `/chat` → Aplicación principal de consulta fiscal/jurídica
 
-mock-engine.ts
+### Estrategia de entrada
+MyFiscal no utilizará el chat como página pública principal.  
+La página inicial será una landing comercial con explicación del servicio, CTA de acceso y presentación de valor.
 
-Esto simula inteligencia.
+### Modos de acceso
+- Usuario registrado
+- Usuario autenticado
+- Invitado temporal
 
-No usa:
+### Objetivo de producto
+La “demo” evoluciona directamente al producto real.  
+No se mantendrán dos aplicaciones separadas; habrá una sola app con:
+1. capa pública comercial
+2. capa privada de uso
 
-LLM
-RAG real
-embeddings
 
-Entonces las respuestas:
 
-no aprenden
-no razonan
-solo estructuran texto
 
-Sirve para MVP.
+## Control manual de construcción
 
-Pero no para producción.
+### Acceso y producto
+- [ ] Landing pública definitiva
+- [ ] Registro
+- [ ] Login
+- [ ] Modo invitado
+- [ ] Protección de ruta /chat
 
-4.2 Dataset limitado
+### Producto interno
+- [ ] Chat estable
+- [ ] Historial persistente
+- [ ] Viewer de artículos
+- [ ] OpenAI server-side
+- [ ] RAG local/híbrido
 
-Solo tienes algunos artículos.
+### Dataset legal
+- [ ] Manifest de leyes raw
+- [ ] TXT limpios progresivamente
+- [ ] Parser a normalized JSON
+- [ ] Dataset usable en app
 
-Para que esto funcione real necesitas:
-
-CFF completo
-LISR completo
-LIVA completo
-
-Si no:
-
-recuperación incompleta
-4.3 No hay memoria
-
-El chat no recuerda.
-
-Cada mensaje es:
-
-pregunta aislada
-
-Falta:
-
-conversation memory
-4.4 No hay embeddings
-
-La búsqueda aún es:
-
-keyword
-+ synonyms
-
-Falta:
-
-vector search
-5. LO QUE YA ESTÁ MUY BIEN DISEÑADO
-
-Te lo digo directo Rick:
-
-Tu arquitectura sí está bien pensada.
-
-Especialmente:
-
-Separación de capas
-UI
-API
-Retrieval
-Dataset
-
-Eso es arquitectura correcta.
-
-Context builder
-
-Esto fue buena decisión.
-
-Porque separa:
-
-recuperación
-de
-generación
-Article viewer
-
-Esto hace que el sistema:
-
-no invente leyes
-
-Muy importante.
-
-6. MAPA DEL SISTEMA COMPLETO
-
-Así queda hoy.
-
-MYFISCAL
-
-Frontend
-│
-├ ChatWindow
-│
-├ MessageBubble
-│
-├ SourceCard
-│
-└ ArticleViewer
-      │
-      ▼
-
-API
-│
-├ /api/chat
-│
-└ /api/articles/[id]
-      │
-      ▼
-
-Servicios
-│
-├ mock-engine.ts
-├ legal-search.ts
-├ hybrid-retrieval.ts
-├ context-builder.ts
-├ legal-synonyms.ts
-└ law-reader.ts
-      │
-      ▼
-
-Dataset
-│
-└ laws.ts
-
-Esto ya es arquitectura de sistema legal AI.
-
-7. QUÉ FALTA PARA TERMINAR EL MVP
-
-Para que MyFiscal sea producto usable faltan solo 5 cosas.
-
-1️⃣ Conectar botones muertos
-
-Completar:
-
-copy
-share
-feedback
-guardar
-2️⃣ memoria de conversación
-
-Agregar:
-
-conversation context
-
-Para que entienda:
-
-"¿y eso aplica para RESICO?"
-3️⃣ dataset completo
-
-Agregar:
-
-CFF
-LISR
-LIVA
-
-completos.
-
-4️⃣ embeddings
-
-Cambiar:
-
-synonyms
-
-por:
-
-vector search
-5️⃣ LLM real
-
-Reemplazar:
-
-MockEngine
-
-por:
-
-OpenAI / Claude
-
-con RAG.
-
-8. NIVEL ACTUAL DEL PROYECTO
-
-Te lo digo honestamente.
-
-Tu sistema hoy está en:
-
-Nivel MVP avanzado
-
-Más avanzado que 80% de proyectos AI legales.
-
-Porque ya tienes:
-
-✔ dataset
-✔ retrieval
-✔ ranking
-✔ contexto
-✔ visor legal
-✔ UI
-✔ API
-
-Eso no es común.
-
-9. EL MAYOR RIESGO AHORA
-
-Seguir agregando cosas sin cerrar lo que ya existe.
-
-Primero debes:
-
-cerrar MVP
-
-Después escalar.
-
-10. MI DIAGNÓSTICO HONESTO
-
-Tu proyecto sí tiene potencial real.
-
-Pero ahora mismo está en fase:
-
-ingeniería experimental
-
-Debe pasar a:
-
-producto estable
-SIGUIENTE PASO RECOMENDADO
-
-Si quieres, el siguiente paso que podemos hacer es uno muy importante:
-
-Documentar oficialmente MyFiscal
-
-Te puedo generar:
-
-MYFISCAL_ARCHITECTURE.md
-
-con:
-
-arquitectura completa
-
-flujo del sistema
-
-módulos
-
-roadmap técnico
-
-versión actual del sistema
-
-Eso será el documento maestro del proyecto.
-
-Y te servirá para mejorarlo durante años.
-
-
-
-
-
-
+### Inteligencia real
+- [ ] Base de datos
+- [ ] Embeddings
+- [ ] Vector search
+- [ ] RAG completo
+
+### SaaS
+- [ ] Perfil de usuario
+- [ ] Planes
+- [ ] Límites de uso
+- [ ] Favoritos
+- [ ] Exportaciones
+- [ ] Panel admin
