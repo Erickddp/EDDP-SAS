@@ -7,8 +7,9 @@ import { PromptSuggestions } from "./prompt-suggestions";
 import { MessageBubble } from "./message-bubble";
 import { Send, Sparkles, Loader2, Info } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChatMode, DetailLevel, Message, ChatRequest, ChatResponse, Conversation } from "@/lib/types";
+import { ChatMode, DetailLevel, Message, ChatRequest, ChatResponse, Conversation, LawArticlePayload, HistoryMessage } from "@/lib/types";
 import { Storage } from "@/lib/storage";
+import { ArticleViewer } from "./article-viewer";
 
 interface ChatWindowProps {
     conversationId: string | null;
@@ -32,6 +33,8 @@ export function ChatWindow({
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState("");
     const [isTyping, setIsTyping] = useState(false);
+    const [selectedArticle, setSelectedArticle] = useState<LawArticlePayload | null>(null);
+    const [isViewerOpen, setIsViewerOpen] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Sync internal state with props
@@ -66,32 +69,38 @@ export function ChatWindow({
         onPrefsChange(mode, newLevel);
     };
 
-    const sendMessage = async (text: string) => {
+    const sendMessage = async (text: string, isRegenerate = false) => {
         if (!text.trim() || isTyping) return;
 
         let targetConvId = conversationId;
 
         // Create conversation on the fly if none selected
         if (!targetConvId) {
-            // Note: In a real app we'd call the parent to create it first. 
-            // Simplified: the parent handles the empty state anyway.
             onNewConversation();
             return;
         }
 
-        const userMessage: Message = {
-            id: Date.now().toString(),
-            conversationId: targetConvId,
-            role: "user",
-            content: text,
-            createdAt: Date.now()
-        };
+        if (!isRegenerate) {
+            const userMessage: Message = {
+                id: Date.now().toString(),
+                conversationId: targetConvId,
+                role: "user",
+                content: text,
+                createdAt: Date.now()
+            };
 
-        const newMessages = [...messages, userMessage];
-        setMessages(newMessages);
-        Storage.saveMessage(userMessage);
-        setInputValue("");
+            setMessages(prev => [...prev, userMessage]);
+            Storage.saveMessage(userMessage);
+            setInputValue("");
+        }
+        
         setIsTyping(true);
+
+        // Prepare history (last 6 messages)
+        const history: HistoryMessage[] = messages.slice(-6).map(m => ({
+            role: m.role === "assistant" ? "assistant" : "user",
+            content: typeof m.content === "string" ? m.content : m.content.summary
+        }));
 
         try {
             const response = await fetch("/api/chat", {
@@ -101,7 +110,8 @@ export function ChatWindow({
                     conversationId: targetConvId,
                     message: text,
                     mode,
-                    detailLevel: detail
+                    detailLevel: detail,
+                    history
                 } as ChatRequest)
             });
 
@@ -139,6 +149,36 @@ export function ChatWindow({
         } finally {
             setIsTyping(false);
         }
+    };
+
+    const handleRegenerate = async () => {
+        if (messages.length === 0 || isTyping) return;
+
+        // Find the last user message
+        const lastUserIdx = [...messages].reverse().findIndex(m => m.role === "user");
+        if (lastUserIdx === -1) return;
+        
+        const realIdx = messages.length - 1 - lastUserIdx;
+        const lastUserMsg = messages[realIdx];
+
+        // Remove all messages after that user message (effectively deleting the failed/old assistant response)
+        const newMessages = messages.slice(0, realIdx + 1);
+        setMessages(newMessages);
+        
+        if (conversationId) {
+            Storage.deleteMessagesAfter(conversationId, lastUserMsg.createdAt);
+        }
+        
+        // Use the functional content if it's a string
+        const text = typeof lastUserMsg.content === "string" ? lastUserMsg.content : "";
+        if (text) {
+            sendMessage(text, true);
+        }
+    };
+
+    const handleOpenArticle = (article: LawArticlePayload) => {
+        setSelectedArticle(article);
+        setIsViewerOpen(true);
     };
 
     return (
@@ -201,6 +241,8 @@ export function ChatWindow({
                                         role={m.role}
                                         content={m.content}
                                         sources={m.sources}
+                                        onOpenArticle={handleOpenArticle}
+                                        onRegenerate={handleRegenerate}
                                     />
                                 ))}
 
@@ -270,6 +312,12 @@ export function ChatWindow({
                     </div>
                 </div>
             </div>
+
+            <ArticleViewer
+                article={selectedArticle}
+                isOpen={isViewerOpen}
+                onClose={() => setIsViewerOpen(false)}
+            />
         </div>
     );
 }

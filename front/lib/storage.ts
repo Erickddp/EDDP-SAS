@@ -31,6 +31,14 @@ export class Storage {
         localStorage.setItem(this.KEY_MESSAGES, JSON.stringify(allMessages));
     }
 
+    static deleteMessagesAfter(conversationId: string, timestamp: number) {
+        if (typeof window === "undefined") return;
+        const data = localStorage.getItem(this.KEY_MESSAGES);
+        const allMessages: Message[] = data ? JSON.parse(data) : [];
+        const filtered = allMessages.filter(m => m.conversationId !== conversationId || m.createdAt <= timestamp);
+        localStorage.setItem(this.KEY_MESSAGES, JSON.stringify(filtered));
+    }
+
     static getPreferences(): UserPreferences {
         if (typeof window === "undefined") return { lastMode: "casual", lastDetailLevel: "sencilla" };
         const data = localStorage.getItem(this.KEY_PREFS);

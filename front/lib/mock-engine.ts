@@ -2,12 +2,13 @@ import { ChatRequest, ChatResponse, StructuredAnswer, SourceReference } from "./
 import { MOCK_KNOWLEDGE, DEFAULT_ANSWER } from "./mock-knowledge";
 
 export class MockEngine {
-    static async processChat(request: ChatRequest): Promise<ChatResponse> {
+    static async processChat(request: ChatRequest, topic?: string): Promise<ChatResponse> {
         const { message, mode, detailLevel } = request;
         const lowerMessage = message.toLowerCase();
 
-        // Find a matching knowledge item by keywords
+        // Find a matching knowledge item by topic OR keywords
         const match = MOCK_KNOWLEDGE.find(item =>
+            (topic && item.theme.toLowerCase() === topic.toLowerCase()) ||
             item.keywords.some(keyword => lowerMessage.includes(keyword))
         );
 
@@ -16,8 +17,8 @@ export class MockEngine {
         let titleSuggestion: string | undefined;
 
         if (match) {
-            answer = match.answers[mode][detailLevel];
-            sources = match.sources;
+            answer = { ...match.answers[mode][detailLevel] };
+            sources = [...match.sources];
             titleSuggestion = match.theme;
         } else {
             answer = { ...DEFAULT_ANSWER };

@@ -1,7 +1,6 @@
-"use client";
-
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { User, Download, CheckCircle2, AlertCircle, FileText, ExternalLink } from "lucide-react";
+import { User, Download, CheckCircle2, AlertCircle, FileText, ExternalLink, Copy, Share2, ThumbsUp, ThumbsDown, RotateCcw, Check } from "lucide-react";
 import { SourceCard } from "./source-card";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
@@ -9,11 +8,14 @@ import { StructuredAnswer, SourceReference } from "@/lib/types";
 
 interface MessageBubbleProps {
     role: "user" | "assistant" | "system";
+    id?: string;
     content: string | StructuredAnswer;
     sources?: SourceReference[];
+    onOpenArticle?: (article: any) => void;
+    onRegenerate?: () => void;
 }
 
-export function MessageBubble({ role, content, sources }: MessageBubbleProps) {
+export function MessageBubble({ role, content, sources, onOpenArticle, onRegenerate }: MessageBubbleProps) {
     const isUser = role === "user";
     const isSystem = role === "system";
 
@@ -56,9 +58,19 @@ export function MessageBubble({ role, content, sources }: MessageBubbleProps) {
                         )}
                     >
                         {typeof content === "string" ? (
-                            <p>{content}</p>
+                            <div className="space-y-4">
+                                <p>{content}</p>
+                                {!isUser && (
+                                    <MessageActions content={content} onRegenerate={onRegenerate} />
+                                )}
+                            </div>
                         ) : (
-                            <StructuredResponseView answer={content} sources={sources} />
+                            <StructuredResponseView 
+                                answer={content} 
+                                sources={sources} 
+                                onOpenArticle={onOpenArticle} 
+                                onRegenerate={onRegenerate}
+                            />
                         )}
                     </div>
                 </div>
@@ -67,7 +79,17 @@ export function MessageBubble({ role, content, sources }: MessageBubbleProps) {
     );
 }
 
-function StructuredResponseView({ answer, sources }: { answer: StructuredAnswer; sources?: SourceReference[] }) {
+function StructuredResponseView({
+    answer,
+    sources,
+    onOpenArticle,
+    onRegenerate
+}: {
+    answer: StructuredAnswer;
+    sources?: SourceReference[];
+    onOpenArticle?: (article: any) => void;
+    onRegenerate?: () => void;
+}) {
     return (
         <div className="space-y-6">
             <div className="space-y-2">
@@ -140,7 +162,14 @@ function StructuredResponseView({ answer, sources }: { answer: StructuredAnswer;
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-3">
                         {sources.map(source => (
-                            <SourceCard key={source.id} name={source.title} type={source.articleRef || source.type} className="p-3" />
+                            <SourceCard
+                                key={source.id}
+                                id={source.id}
+                                name={source.title}
+                                type={source.articleRef || source.type}
+                                onView={onOpenArticle}
+                                className="p-3"
+                            />
                         ))}
                     </div>
                 </div>
@@ -150,10 +179,137 @@ function StructuredResponseView({ answer, sources }: { answer: StructuredAnswer;
                 <p className="text-[10px] text-text-sec leading-tight max-w-[400px]">
                     <span className="font-bold text-red-400/80">AVISO:</span> {answer.disclaimer}
                 </p>
-                <Button variant="outline" size="sm" className="gap-2 text-xs h-8 whitespace-nowrap opacity-80 hover:opacity-100">
-                    <Download size={14} /> Descargar reporte
-                </Button>
+                <div className="hidden sm:block text-[10px] text-text-sec uppercase font-bold opacity-40">
+                    ID: {Math.random().toString(36).substring(7)}
+                </div>
             </div>
+
+            <MessageActions content={answer} onRegenerate={onRegenerate} />
+        </div>
+    );
+}
+
+function MessageActions({ 
+    content, 
+    onRegenerate 
+}: { 
+    content: string | StructuredAnswer, 
+    onRegenerate?: () => void 
+}) {
+    const [copied, setCopied] = useState(false);
+    const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
+
+    const handleCopy = () => {
+        let text = "";
+        if (typeof content === "string") {
+            text = content;
+        } else {
+            text = `SÍNTESIS: ${content.summary}\n\nFUNDAMENTO: ${content.foundation.join(", ")}\n\nESCENARIOS: ${content.scenarios.join(", ")}\n\nCONSECUENCIAS: ${content.consequences.join(", ")}\n\nCERTEZA: ${content.certainty}\n\nAVISO: ${content.disclaimer}`;
+        }
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleShare = async () => {
+        const text = typeof content === "string" ? content : content.summary;
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'MyFiscal - Consulta Legal',
+                    text: text,
+                    url: window.location.href
+                });
+            } catch (err) {
+                handleCopy();
+            }
+        } else {
+            handleCopy();
+        }
+    };
+
+    const handleDownload = () => {
+        let text = "";
+        if (typeof content === "string") {
+            text = content;
+        } else {
+            text = `MYFISCAL - REPORTE DE CONSULTA\n\nSÍNTESIS:\n${content.summary}\n\nFUNDAMENTO:\n- ${content.foundation.join("\n- ")}\n\nESCENARIOS:\n- ${content.scenarios.join("\n- ")}\n\nCONSECUENCIAS:\n- ${content.consequences.join("\n- ")}\n\nCERTEZA: ${content.certainty}\n\nAVISO LEGAL: ${content.disclaimer}\n\nGenerado por MyFiscal v1.0`;
+        }
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `myfiscal-respuesta-${Date.now()}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    return (
+        <div className="flex flex-wrap items-center gap-1 sm:gap-4 mt-2 pt-4 border-t border-border-glow/10">
+            <button 
+                onClick={handleCopy} 
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 text-text-sec transition-colors text-[10px] uppercase font-bold"
+                title="Copiar respuesta"
+            >
+                {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                <span className="hidden xs:inline">{copied ? "Copiado" : "Copiar"}</span>
+            </button>
+
+            <button 
+                onClick={handleShare} 
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 text-text-sec transition-colors text-[10px] uppercase font-bold"
+                title="Compartir"
+            >
+                <Share2 size={14} />
+                <span className="hidden xs:inline">Compartir</span>
+            </button>
+
+            <button 
+                onClick={handleDownload} 
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 text-text-sec transition-colors text-[10px] uppercase font-bold"
+                title="Descargar .txt"
+            >
+                <Download size={14} />
+                <span className="hidden xs:inline">Descargar</span>
+            </button>
+
+            <div className="h-4 w-px bg-border-glow/20 mx-1 hidden sm:block" />
+
+            <div className="flex items-center gap-1">
+                <button 
+                    onClick={() => setFeedback('up')} 
+                    className={cn(
+                        "p-1.5 rounded-lg hover:bg-white/5 transition-colors", 
+                        feedback === 'up' ? "text-cyan-main bg-cyan-main/10" : "text-text-sec"
+                    )}
+                    title="Útil"
+                >
+                    <ThumbsUp size={14} />
+                </button>
+                <button 
+                    onClick={() => setFeedback('down')} 
+                    className={cn(
+                        "p-1.5 rounded-lg hover:bg-white/5 transition-colors", 
+                        feedback === 'down' ? "text-red-400 bg-red-400/10" : "text-text-sec"
+                    )}
+                    title="No útil"
+                >
+                    <ThumbsDown size={14} />
+                </button>
+            </div>
+
+            {onRegenerate && (
+                <button 
+                    onClick={onRegenerate} 
+                    className="ml-auto flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 text-text-sec transition-colors text-[10px] uppercase font-bold"
+                    title="Regenerar respuesta"
+                >
+                    <RotateCcw size={14} />
+                    <span className="hidden xs:inline">Regenerar</span>
+                </button>
+            )}
         </div>
     );
 }

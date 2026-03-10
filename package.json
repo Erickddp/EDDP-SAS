@@ -1,0 +1,11 @@
+{
+  "name": "eddp-sas",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix front",
+    "build": "npm run build --prefix front",
+    "start": "npm run start --prefix front",
+    "lint": "npm run lint --prefix front"
+  }
+}

@@ -10,23 +10,29 @@ export interface SourceReference {
     text?: string; // Full text of the law article
 }
 
-export interface LawDocument {
+export type LawDocument = {
     id: string;
     name: string;
     abbreviation: string;
-    source?: string;
-    lastUpdate?: string;
-}
+    source: string;
+    lastUpdate: string;
+};
 
-export interface LawArticle {
-    id: string;
-    document: string;
-    abbreviation: string;
+export type LawArticle = {
+    id: string; // Unique ID (e.g., cff-27)
+    documentId: string;
+    documentName: string;
+    documentAbbreviation: string;
     articleNumber: string;
-    title: string;
+    title?: string;
     text: string;
     keywords: string[];
-}
+    source: string;
+};
+
+export type LawArticlePayload = LawArticle & {
+    document: LawDocument;
+};
 
 export interface StructuredAnswer {
     summary: string;
@@ -60,11 +66,17 @@ export interface UserPreferences {
     lastDetailLevel: DetailLevel;
 }
 
+export interface HistoryMessage {
+    role: "user" | "assistant";
+    content: string;
+}
+
 export interface ChatRequest {
     conversationId: string;
     message: string;
     mode: ChatMode;
     detailLevel: DetailLevel;
+    history?: HistoryMessage[];
 }
 
 export interface ChatResponse {

@@ -115,7 +115,12 @@ export function Sidebar({
                             <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-main/10 blur-xl rounded-full" aria-hidden="true" />
                             <div className="text-[10px] font-bold text-cyan-main mb-1 uppercase tracking-widest opacity-80">Edición Beta</div>
                             <h4 className="text-base font-bold text-text-main mb-3">Acceso Gratuito</h4>
-                            <Button variant="primary" size="sm" className="w-full text-xs h-8 shadow-sm">
+                            <Button 
+                                variant="primary" 
+                                size="sm" 
+                                className="w-full text-xs h-8 shadow-sm"
+                                onClick={() => alert("¡Gracias por tu interés! La versión Pro de MyFiscal está en desarrollo. Te avisaremos pronto.")}
+                            >
                                 Unirse a la Pro
                             </Button>
                         </>
