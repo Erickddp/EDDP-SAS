@@ -5,6 +5,7 @@ import { tokenizeQuery } from "@/lib/legal-search";
 import { buildLegalContext } from "@/lib/context-builder";
 import { openai, OPENAI_MODEL } from "@/lib/openai";
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/llm-prompt";
+import { parseLegalReference } from "@/lib/law-alias";
 
 export async function POST(req: Request) {
     try {
@@ -35,12 +36,21 @@ export async function POST(req: Request) {
             }
         }
 
-        // 1. Obtener contexto legal enriquecido (RAG Híbrido Local)
-        const context = buildLegalContext(effectiveQuery, 3);
+        // 0.5. Extraer intención determinista de artículos / leyes 
+        const parsedRef = parseLegalReference(effectiveQuery);
+
+        // 1. Obtener contexto legal enriquecido (RAG Híbrido Local o Base de Datos)
+        const context = await buildLegalContext(effectiveQuery, parsedRef, 3);
 
         // 2. Generar respuesta (OpenAI con fallback a MockEngine)
         let answer: StructuredAnswer;
         let mockResult = null;
+
+        // Determinar estrategia exacta
+        const hasExactMatch = !!parsedRef.lawAbbreviation && !!parsedRef.articleNumber && context.retrievedArticles.length > 0;
+        const retrievalStrategy = hasExactMatch ? 'exact-law-article' : context.retrievalMeta.strategy;
+
+        console.log(`[Observability] Estrategia: ${retrievalStrategy} | ExactMatch: ${hasExactMatch ? 'Sí' : 'No'} | Fallback: ${context.retrievalMeta.strategy}`);
 
         if (openai) {
             try {
@@ -53,7 +63,9 @@ export async function POST(req: Request) {
                             detailLevel: body.detailLevel, 
                             topic: context.topic, 
                             legalContext: context.retrievedArticles,
-                            history: body.history 
+                            history: body.history,
+                            retrievalStrategy,
+                            parsedRef
                         }) },
                         { role: "user", content: buildUserPrompt({ 
                             message: body.message, 
@@ -61,7 +73,9 @@ export async function POST(req: Request) {
                             detailLevel: body.detailLevel, 
                             topic: context.topic, 
                             legalContext: context.retrievedArticles,
-                            history: body.history 
+                            history: body.history,
+                            retrievalStrategy,
+                            parsedRef
                         }) }
                     ],
                     response_format: { type: "json_object" },

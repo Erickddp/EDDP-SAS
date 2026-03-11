@@ -2,9 +2,11 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { X, FileText, Bookmark, Info, Calendar, ExternalLink } from "lucide-react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LawArticlePayload } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface ArticleViewerProps {
     article: LawArticlePayload | null;
@@ -13,6 +15,8 @@ interface ArticleViewerProps {
 }
 
 export function ArticleViewer({ article, isOpen, onClose }: ArticleViewerProps) {
+    const [isFavorite, setIsFavorite] = useState(false);
+
     if (!article && isOpen) return null;
 
     return (
@@ -66,10 +70,21 @@ export function ArticleViewer({ article, isOpen, onClose }: ArticleViewerProps) 
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 space-y-8">
                             {/* Article identification */}
                             <div className="space-y-4">
-                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-main/5 border border-cyan-main/20 text-cyan-glow">
-                                    <Bookmark size={14} />
-                                    <span className="text-sm font-bold uppercase tracking-widest">Artículo {article.articleNumber}</span>
-                                </div>
+                                <button 
+                                    onClick={() => setIsFavorite(!isFavorite)}
+                                    className={cn(
+                                        "inline-flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all hover:scale-105 active:scale-95 group",
+                                        isFavorite 
+                                            ? "bg-yellow-400/10 border-yellow-400/30 text-yellow-500 shadow-[0_0_15px_rgba(250,204,21,0.15)]" 
+                                            : "bg-cyan-main/5 border-cyan-main/20 text-cyan-glow hover:bg-cyan-main/10"
+                                    )}
+                                    title="Marcar como favorito"
+                                >
+                                    <Bookmark size={14} className={cn(isFavorite ? "fill-current" : "")} />
+                                    <span className="text-sm font-bold uppercase tracking-widest mt-0.5">
+                                        Artículo {article.articleNumber} {isFavorite && "- Guardado"}
+                                    </span>
+                                </button>
 
                                 {article.title && (
                                     <h3 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-text-main to-text-main/60 leading-tight">

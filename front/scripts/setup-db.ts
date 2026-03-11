@@ -19,7 +19,9 @@ console.log(`🔌 Conectando a: ${maskedUrl}`);
 
 const pool = new Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false } // Required for Supabase
+  ssl: { rejectUnauthorized: false }, // Required for Supabase
+  connectionTimeoutMillis: 15000,
+  keepAlive: true,
 });
 
 async function setupDb() {
@@ -28,8 +30,14 @@ async function setupDb() {
 
   console.log('🚀 Setting up database schema...');
   try {
-    await pool.query(schemaSql);
-    console.log('✅ Schema applied successfully.');
+    console.log('⏳ Probando conexión al pool...');
+    const client = await pool.connect();
+    console.log('✅ Conexión establecida.');
+    
+    console.log('⏳ Ejecutando schema.sql...');
+    await client.query(schemaSql);
+    console.log('✅ Schema aplicado correctamente.');
+    client.release();
   } catch (error: any) {
     console.error('❌ Error applying schema:', {
       message: error.message,

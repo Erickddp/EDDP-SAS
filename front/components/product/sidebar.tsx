@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { MessageSquare, Plus, PanelLeftClose, Trash2 } from "lucide-react";
+import { MessageSquare, Plus, PanelLeftClose, Trash2, CheckCircle2 } from "lucide-react";
 import { Button } from "../ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ export function Sidebar({
     onNew,
     conversations = []
 }: SidebarProps) {
+    const [joinedPro, setJoinedPro] = useState(false);
 
     return (
         <aside
@@ -116,12 +118,18 @@ export function Sidebar({
                             <div className="text-[10px] font-bold text-cyan-main mb-1 uppercase tracking-widest opacity-80">Edición Beta</div>
                             <h4 className="text-base font-bold text-text-main mb-3">Acceso Gratuito</h4>
                             <Button 
-                                variant="primary" 
+                                variant={joinedPro ? "outline" : "primary"} 
                                 size="sm" 
-                                className="w-full text-xs h-8 shadow-sm"
-                                onClick={() => alert("¡Gracias por tu interés! La versión Pro de MyFiscal está en desarrollo. Te avisaremos pronto.")}
+                                className={cn(
+                                    "w-full text-xs h-8 shadow-sm transition-all",
+                                    joinedPro ? "bg-green-400/10 border-green-400/30 text-green-400 hover:bg-green-400/20" : ""
+                                )}
+                                onClick={() => setJoinedPro(true)}
+                                disabled={joinedPro}
                             >
-                                Unirse a la Pro
+                                {joinedPro ? (
+                                    <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> ¡Anotado en lista!</span>
+                                ) : "Unirse a la Pro"}
                             </Button>
                         </>
                     )}

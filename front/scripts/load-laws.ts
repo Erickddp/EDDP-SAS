@@ -19,7 +19,8 @@ console.log(`🔌 Conectando a: ${maskedUrl}`);
 
 const pool = new Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false } // Required for Supabase
+  ssl: { rejectUnauthorized: false }, // Required for Supabase
+  connectionTimeoutMillis: 15000,
 });
 
 async function loadLaws() {
@@ -37,6 +38,7 @@ async function loadLaws() {
     return;
   }
 
+  console.log(`📂 Encontrados ${files.length} archivos JSON para cargar.\n`);
   console.log('🚀 Iniciando carga legal...\n');
   
   let totalDocs = 0;
@@ -48,12 +50,16 @@ async function loadLaws() {
     
     const { document, articles } = content;
     
+    // Use a single client for transaction
+    const client = await pool.connect();
+    
     try {
-      // 1. Upsert Document
-      console.log(`📄 Cargando documento ${document.abbreviation} (${document.id})`);
+      await client.query('BEGIN');
       
-      // Update column names: document_name, filename
-      await pool.query(
+      // 1. Upsert Document
+      console.log(`📄 [${document.id}] ${document.abbreviation} - ${document.documentName}`);
+      
+      await client.query(
         `INSERT INTO documents (id, document_name, filename, abbreviation, category, source, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (id) DO UPDATE SET
@@ -79,7 +85,7 @@ async function loadLaws() {
       // 2. Upsert Articles
       let docArticles = 0;
       for (const article of articles) {
-        await pool.query(
+        await client.query(
           `INSERT INTO articles (id, document_id, article_number, title, text)
            VALUES ($1, $2, $3, $4, $5)
            ON CONFLICT (id) DO UPDATE SET
@@ -92,14 +98,18 @@ async function loadLaws() {
         totalArticles++;
       }
       
-      console.log(`   → ${docArticles} artículos insertados/actualizados`);
+      await client.query('COMMIT');
+      console.log(`   ✅ ${docArticles} artículos sincronizados.`);
       
     } catch (error: any) {
+      await client.query('ROLLBACK');
       console.error(`❌ Error procesando ${file}:`, {
         message: error.message,
         code: error.code,
         detail: error.detail
       });
+    } finally {
+      client.release();
     }
   }
 

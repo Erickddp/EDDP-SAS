@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { User, Download, CheckCircle2, AlertCircle, FileText, ExternalLink, Copy, Share2, ThumbsUp, ThumbsDown, RotateCcw, Check } from "lucide-react";
+import { User, Download, CheckCircle2, AlertCircle, FileText, ExternalLink, Copy, Share2, ThumbsUp, ThumbsDown, RotateCcw, Check, MessageCircle, Bookmark, Printer } from "lucide-react";
 import { SourceCard } from "./source-card";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
@@ -198,6 +198,7 @@ function MessageActions({
 }) {
     const [copied, setCopied] = useState(false);
     const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
+    const [isFavorite, setIsFavorite] = useState(false);
 
     const handleCopy = () => {
         let text = "";
@@ -228,6 +229,47 @@ function MessageActions({
         }
     };
 
+    const handleWhatsApp = () => {
+        const text = typeof content === "string" ? content : `MyFiscal: ${content.summary}`;
+        const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank');
+    };
+
+    const handleDownloadPDF = () => {
+        let text = "";
+        if (typeof content === "string") {
+            text = content;
+        } else {
+            text = `<h1>MYFISCAL - REPORTE DE CONSULTA</h1>
+            <h3>Síntesis:</h3><p>${content.summary}</p>
+            <h3>Fundamento:</h3><ul><li>${content.foundation.join("</li><li>")}</li></ul>
+            <h3>Escenarios:</h3><ul><li>${content.scenarios.join("</li><li>")}</li></ul>
+            <h3>Consecuencias:</h3><ul><li>${content.consequences.join("</li><li>")}</li></ul>
+            <p><b>Certeza:</b> ${content.certainty}</p>
+            <p><small>Aviso legal: ${content.disclaimer}</small></p>`;
+        }
+        
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>MyFiscal Reporte</title>
+                        <style>
+                            body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; padding: 40px; color: #111; max-width: 800px; margin: 0 auto; }
+                            h1, h3 { color: #0284c7; }
+                            ul { margin-bottom: 20px; }
+                        </style>
+                    </head>
+                    <body onload="window.print();window.close();">
+                        ${text}
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+    };
+
     const handleDownload = () => {
         let text = "";
         if (typeof content === "string") {
@@ -247,7 +289,7 @@ function MessageActions({
     };
 
     return (
-        <div className="flex flex-wrap items-center gap-1 sm:gap-4 mt-2 pt-4 border-t border-border-glow/10">
+        <div className="flex flex-wrap items-center gap-1 sm:gap-2 mt-2 pt-4 border-t border-border-glow/10">
             <button 
                 onClick={handleCopy} 
                 className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 text-text-sec transition-colors text-[10px] uppercase font-bold"
@@ -258,28 +300,48 @@ function MessageActions({
             </button>
 
             <button 
+                onClick={handleWhatsApp} 
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 text-text-sec transition-colors text-[10px] uppercase font-bold"
+                title="WhatsApp"
+            >
+                <MessageCircle size={14} />
+                <span className="hidden lg:inline">WhatsApp</span>
+            </button>
+
+            <button 
+                onClick={handleDownloadPDF} 
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 text-text-sec transition-colors text-[10px] uppercase font-bold"
+                title="Exportar PDF"
+            >
+                <Printer size={14} />
+                <span className="hidden lg:inline">PDF</span>
+            </button>
+
+            <button 
                 onClick={handleShare} 
                 className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 text-text-sec transition-colors text-[10px] uppercase font-bold"
                 title="Compartir"
             >
                 <Share2 size={14} />
-                <span className="hidden xs:inline">Compartir</span>
-            </button>
-
-            <button 
-                onClick={handleDownload} 
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 text-text-sec transition-colors text-[10px] uppercase font-bold"
-                title="Descargar .txt"
-            >
-                <Download size={14} />
-                <span className="hidden xs:inline">Descargar</span>
             </button>
 
             <div className="h-4 w-px bg-border-glow/20 mx-1 hidden sm:block" />
 
-            <div className="flex items-center gap-1">
+            <button 
+                onClick={() => setIsFavorite(!isFavorite)} 
+                className={cn(
+                    "flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors text-[10px] uppercase font-bold",
+                    isFavorite ? "text-yellow-400 bg-yellow-400/10" : "text-text-sec"
+                )}
+                title="Favorito"
+            >
+                <Bookmark size={14} />
+                <span className="hidden sm:inline">Favorito</span>
+            </button>
+
+            <div className="flex items-center gap-0.5">
                 <button 
-                    onClick={() => setFeedback('up')} 
+                    onClick={() => setFeedback(feedback === 'up' ? null : 'up')} 
                     className={cn(
                         "p-1.5 rounded-lg hover:bg-white/5 transition-colors", 
                         feedback === 'up' ? "text-cyan-main bg-cyan-main/10" : "text-text-sec"
@@ -289,7 +351,7 @@ function MessageActions({
                     <ThumbsUp size={14} />
                 </button>
                 <button 
-                    onClick={() => setFeedback('down')} 
+                    onClick={() => setFeedback(feedback === 'down' ? null : 'down')} 
                     className={cn(
                         "p-1.5 rounded-lg hover:bg-white/5 transition-colors", 
                         feedback === 'down' ? "text-red-400 bg-red-400/10" : "text-text-sec"
@@ -303,10 +365,10 @@ function MessageActions({
             {onRegenerate && (
                 <button 
                     onClick={onRegenerate} 
-                    className="ml-auto flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 text-text-sec transition-colors text-[10px] uppercase font-bold"
+                    className="ml-auto flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white/5 text-text-sec transition-colors text-[10px] uppercase font-bold group"
                     title="Regenerar respuesta"
                 >
-                    <RotateCcw size={14} />
+                    <RotateCcw size={14} className="group-active:-rotate-180 transition-transform duration-500" />
                     <span className="hidden xs:inline">Regenerar</span>
                 </button>
             )}

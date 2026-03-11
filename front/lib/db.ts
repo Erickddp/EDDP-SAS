@@ -11,7 +11,12 @@ const pool = new Pool({
   // Enforce SSL for Supabase compatibility
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  // Supabase/Serverless best practices
+  connectionTimeoutMillis: 15000,
+  idleTimeoutMillis: 30000,
+  max: 10,
+  keepAlive: true,
 });
 
 /**

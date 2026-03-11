@@ -20,5 +20,49 @@
     "officialSource": "DOF / Cámara de Diputados",
     "status": "vigente",
     "notes": "Ley fiscal principal de ISR"
+  },
+  {
+    "id": "03",
+    "filename": "03.txt",
+    "documentName": "Ley del Impuesto al Valor Agregado",
+    "abbreviation": "LIVA",
+    "category": "fiscal",
+    "sourceType": "texto legal",
+    "officialSource": "DOF / Cámara de Diputados",
+    "status": "vigente",
+    "notes": "Ley fiscal del IVA"
+  },
+  {
+    "id": "04",
+    "filename": "04.txt",
+    "documentName": "Código Fiscal de la Federación",
+    "abbreviation": "CFF",
+    "category": "fiscal",
+    "sourceType": "texto legal",
+    "officialSource": "DOF / Cámara de Diputados",
+    "status": "vigente",
+    "notes": "Código Fiscal"
+  },
+  {
+    "id": "05",
+    "filename": "05.txt",
+    "documentName": "Código Fiscal de la Federación",
+    "abbreviation": "CFF",
+    "category": "fiscal",
+    "sourceType": "texto legal",
+    "officialSource": "DOF / Cámara de Diputados",
+    "status": "vigente",
+    "notes": "Evidente duplicado de 04.txt (contenido idéntico)"
+  },
+  {
+    "id": "06",
+    "filename": "06.txt",
+    "documentName": "Ley Orgánica de la Procuraduría de la Defensa del Contribuyente",
+    "abbreviation": "LOPDC",
+    "category": "fiscal",
+    "sourceType": "texto legal",
+    "officialSource": "DOF / Cámara de Diputados",
+    "status": "vigente",
+    "notes": "Ley Orgánica de la PRODECON"
   }
 ]

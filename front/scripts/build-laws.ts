@@ -26,7 +26,7 @@ async function main() {
 
   const manifestData: LawManifestEntry[] = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf-8'));
   
-  console.log(`📜 Manifest cargado con ${manifestData.length} entradas.\n`);
+  console.log(`📜 Manifest cargado: ${manifestData.length} documentos encontrados.\n`);
 
   let totalArticles = 0;
   let successCount = 0;
