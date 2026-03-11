@@ -1,7 +1,4 @@
-import * as dotenv from 'dotenv';
-import path from 'path';
-dotenv.config({ path: path.join(process.cwd(), '.env') });
-
+import "./load-env";
 import { getClient } from '../lib/db';
 
 async function updateSchema() {
@@ -51,14 +48,21 @@ async function updateSchema() {
         RETURN QUERY
         SELECT 
           l.id, l.abbreviation, l.article_number, l.content, l.sections,
-          -- Cálulo de similitud base + BOOSTING jerárquico (Hard rule)
+          -- Cálculo de similitud base + BOOSTING jerárquico
           (1 - (l.embedding <=> query_embedding)) 
-          + CASE WHEN filter_abbrev IS NOT NULL AND l.abbreviation = filter_abbrev THEN 0.35 ELSE 0 END
-          + CASE WHEN filter_art IS NOT NULL AND l.article_number = filter_art THEN 0.30 ELSE 0 END
+          + CASE WHEN filter_abbrev IS NOT NULL AND l.abbreviation = filter_abbrev THEN 0.40 ELSE 0 END
+          + CASE 
+              WHEN filter_art IS NOT NULL AND (
+                l.article_number = filter_art OR 
+                l.article_number = filter_art || 'o' OR
+                replace(l.article_number, 'o', '') = filter_art
+              ) THEN 0.50 
+              ELSE 0 
+            END
           AS similarity
         FROM legal_documents l
-        -- Threshold base más flexible para permitir búsqueda semántica
-        WHERE (1 - (l.embedding <=> query_embedding)) > 0.45
+        -- Threshold base más bajo para permitir mayor recall semántico
+        WHERE (1 - (l.embedding <=> query_embedding)) > 0.25
         ORDER BY similarity DESC
         LIMIT match_count;
       END;

@@ -46,13 +46,13 @@
   {
     "id": "05",
     "filename": "05.txt",
-    "documentName": "Código Fiscal de la Federación",
-    "abbreviation": "CFF",
-    "category": "fiscal",
+    "documentName": "Código de Comercio",
+    "abbreviation": "CCOM",
+    "category": "mercantil",
     "sourceType": "texto legal",
     "officialSource": "DOF / Cámara de Diputados",
     "status": "vigente",
-    "notes": "Evidente duplicado de 04.txt (contenido idéntico)"
+    "notes": "Código de Comercio"
   },
   {
     "id": "06",

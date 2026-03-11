@@ -12,7 +12,9 @@ export const ALIAS_MAP: Record<string, string> = {
   "isr": "LISR",
   "ley del isr": "LISR",
   "lft": "LFT",
-  "ley federal del trabajo": "LFT"
+  "ley federal del trabajo": "LFT",
+  "ccom": "CCOM",
+  "codigo de comercio": "CCOM"
 };
 
 export function detectLawAlias(query: string): string | null {

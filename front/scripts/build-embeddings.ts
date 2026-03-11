@@ -1,10 +1,9 @@
+import "./load-env";
 import { getClient } from "../lib/db";
 import { generateEmbedding } from "../lib/embedding";
 import fs from "fs";
 import path from "path";
 import { parseArgs } from 'util';
-import * as dotenv from 'dotenv';
-dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 const { values } = parseArgs({ args: process.argv.slice(2), options: { target: { type: 'string' } }, strict: false });
 const target = values.target ? String(values.target).toUpperCase() : undefined;

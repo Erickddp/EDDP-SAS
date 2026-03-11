@@ -1,14 +1,16 @@
+import "./load-env";
 import { searchArticles } from "../lib/vector-search";
 import { parseLegalReference } from "../lib/law-alias";
-import * as dotenv from 'dotenv';
-import path from 'path';
-dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 async function test() {
   const queries = [
     "art 1 cpeum",
     "art 100 lisr",
-    "por que debo pagar impuestos"
+    "art 1 cccom",
+    "art 1 ccom",
+    "quienes son los comerciantes",
+    "las personas fisicas y morales estan obligadas a contribuir",
+    "actos de comercio segun el codigo de comercio"
   ];
 
   for (const q of queries) {

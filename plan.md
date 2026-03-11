@@ -296,3 +296,97 @@ No se mantendrán dos aplicaciones separadas; habrá una sola app con:
 - [ ] Favoritos
 - [ ] Exportaciones
 - [ ] Panel admin
+
+
+
+
+
+
+
+
+
+
+
+## 7. Pipeline de ingestión legal
+
+### Entrada raw
+Los documentos legales se almacenan en:
+`data/legal/raw/`
+
+Se usan archivos numerados (`01.txt`, `02.txt`, etc.) y un `manifest.json` como mapa maestro de identificación documental.
+
+### Salida normalizada
+Los documentos procesados se guardan en:
+`data/legal/normalized/`
+
+Cada archivo JSON contiene:
+- metadata del documento
+- artículos detectados
+- texto limpio por artículo
+
+### Objetivo del pipeline
+Separar la captura de documentos legales crudos de la estructura jurídica utilizable por el motor de búsqueda, retrieval y RAG.
+
+
+
+
+
+
+### Ingestión legal
+- [ ] Crear manifest maestro
+- [ ] Cargar TXT raw numerados
+- [ ] Parser de artículos
+- [ ] JSON normalizados por documento
+- [ ] Validación manual de artículos detectados
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### FINAL
+
+
