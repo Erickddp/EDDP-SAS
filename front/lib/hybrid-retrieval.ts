@@ -64,8 +64,9 @@ export function hybridSearchArticles(query: string, limit = 4): HybridSearchResu
     const expandedPhrases = expandNormalizedQuery(query);
 
     // Obtener una base amplia de artículos candidatos usando la búsqueda determinística actual
-    // Usamos un límite mayor para re-rankear después
-    const keywordCandidates = searchArticles(query, 12);
+    // Usamos un límite mayor para re-rankear después (escala con profundidad)
+    const candidatePool = Math.max(12, limit * 3);
+    const keywordCandidates = searchArticles(query, candidatePool);
     const candidateIds = new Set(keywordCandidates.map(a => a.id));
 
     const allResults: HybridSearchResult[] = [];

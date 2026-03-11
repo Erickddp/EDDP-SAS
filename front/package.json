@@ -12,7 +12,13 @@
     "load:laws": "tsx --env-file=.env scripts/load-laws.ts",
     "setup:db": "tsx --env-file=.env scripts/setup-db.ts",
     "schema:update": "tsx --env-file=.env scripts/schema-update.ts",
-    "ingest": "tsx --env-file=.env scripts/build-embeddings.ts"
+    "ingest": "tsx --env-file=.env scripts/build-embeddings.ts",
+    "test:adaptive": "tsx --env-file=.env scripts/test-adaptive-engine.ts",
+    "test:intents": "tsx --env-file=.env scripts/test-intent-detection.ts",
+    "test:memory": "tsx --env-file=.env scripts/test-conversation-memory.ts",
+    "test:depth": "tsx --env-file=.env scripts/test-depth-enforcement.ts",
+    "test:followup": "tsx --env-file=.env scripts/test-followup-compression.ts",
+    "test:retrieval": "tsx --env-file=.env scripts/test-retrieval.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

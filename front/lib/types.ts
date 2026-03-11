@@ -1,6 +1,15 @@
 export type ChatMode = "casual" | "profesional";
 export type DetailLevel = "sencilla" | "detallada" | "tecnica";
 
+export interface QueryAnalysis {
+    complexity: "simple" | "normal" | "complex";
+    mode: "casual" | "professional";
+    detail: "simple" | "detailed" | "technical";
+    retrievalDepth: number;
+    tokenLimit: number;
+    detectedIntent: "multa" | "calculo" | "plazo" | "general";
+}
+
 export interface SourceReference {
     id: string;
     title: string;
@@ -41,6 +50,24 @@ export interface StructuredAnswer {
     consequences: string[];
     certainty: string;
     disclaimer: string;
+    // Adaptive fields (present only in complex responses)
+    relatedArticles?: string[];
+    legalInterpretation?: string;
+    // Intent: multa
+    montoMinimo?: string;
+    montoMaximo?: string;
+    factoresAgravantes?: string[];
+    reduccion?: string | null;
+    // Intent: calculo
+    pasos?: string[];
+    formula?: string;
+    variables?: string[];
+    ejemploNumerico?: string;
+    // Intent: plazo
+    fechaLimite?: string;
+    periodicidad?: string;
+    consecuenciaIncumplimiento?: string;
+    prorrogas?: string | null;
 }
 
 export interface Message {
@@ -83,4 +110,45 @@ export interface ChatResponse {
     answer: StructuredAnswer;
     sources: SourceReference[];
     titleSuggestion?: string;
+    queryAnalysis?: QueryAnalysis;
+    _debug?: AdaptiveDebugMeta;
+}
+
+export interface AdaptiveDebugMeta {
+    queryDebug: {
+        wordCount: number;
+        legalKeywordCount: number;
+        matchedKeywords: string[];
+        complexPhraseCount: number;
+        matchedPhrases: string[];
+        hasCalculation: boolean;
+        multiLawRef: boolean;
+        lawRefsFound: string[];
+        hasNumbers: boolean;
+        rawScore: number;
+        heuristicComplexity: string;
+        finalComplexity: string;
+        elevatedByUser: boolean;
+    };
+    retrievalRequested: number;
+    retrievalReturned: number;
+    topSources: string[];
+    tokenLimit: number;
+    promptComplexity: string;
+    promptMode: string;
+    promptDetail: string;
+    detectedIntent: string;
+    followUpDetected: boolean;
+    followUpReason: string;
+    reusedTopic: string | null;
+    retrievalStrategy: string;
+    depthRulesApplied: boolean;
+    targetMinWords: number;
+    targetMaxWords: number;
+    followUpCompressionApplied: boolean;
+    compressedTokenLimit: number | null;
+    compressedWordLimit: number | null;
+    retrievedArticlesCount: number;
+    articleDiversityApplied: boolean;
+    previousArticlesExcluded: number;
 }

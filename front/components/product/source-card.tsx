@@ -20,13 +20,15 @@ export function SourceCard({ id, name, type, className, onView }: SourceCardProp
 
         setIsLoading(true);
         try {
-            const response = await fetch(`/api/articles/${id}`);
-            if (!response.ok) throw new Error("No se pudo cargar el artículo");
+            const response = await fetch(`/api/articles/${encodeURIComponent(id)}`);
+            if (!response.ok) throw new Error("No se pudo cargar el articulo");
+
             const data = await response.json();
+            if (!data?.article) throw new Error("Respuesta de articulo invalida");
+
             onView(data.article);
         } catch (error) {
             console.error("Error loading article:", error);
-            // Revert loading state if error
         } finally {
             setIsLoading(false);
         }
@@ -54,7 +56,7 @@ export function SourceCard({ id, name, type, className, onView }: SourceCardProp
                     disabled={isLoading}
                     className="flex items-center gap-1.5 text-xs font-semibold text-cyan-main hover:text-cyan-glow transition-colors disabled:opacity-50"
                 >
-                    {isLoading ? "Cargando..." : "Ver artículo"}
+                    {isLoading ? "Cargando..." : "Ver articulo"}
                     {!isLoading && <ExternalLink size={14} />}
                 </button>
             </div>

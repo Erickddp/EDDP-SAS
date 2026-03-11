@@ -6,7 +6,7 @@
     "abbreviation": "CPEUM",
     "category": "constitucional",
     "sourceType": "texto legal",
-    "officialSource": "DOF / Cámara de Diputados",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/CPEUM.pdf",
     "status": "vigente",
     "notes": "Texto base constitucional"
   },
@@ -17,7 +17,7 @@
     "abbreviation": "LISR",
     "category": "fiscal",
     "sourceType": "texto legal",
-    "officialSource": "DOF / Cámara de Diputados",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LISR.pdf",
     "status": "vigente",
     "notes": "Ley fiscal principal de ISR"
   },
@@ -28,7 +28,7 @@
     "abbreviation": "LIVA",
     "category": "fiscal",
     "sourceType": "texto legal",
-    "officialSource": "DOF / Cámara de Diputados",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LIVA.pdf",
     "status": "vigente",
     "notes": "Ley fiscal del IVA"
   },
@@ -39,7 +39,7 @@
     "abbreviation": "CFF",
     "category": "fiscal",
     "sourceType": "texto legal",
-    "officialSource": "DOF / Cámara de Diputados",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/CFF.pdf",
     "status": "vigente",
     "notes": "Código Fiscal"
   },
@@ -50,7 +50,7 @@
     "abbreviation": "CCOM",
     "category": "mercantil",
     "sourceType": "texto legal",
-    "officialSource": "DOF / Cámara de Diputados",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/CCom.pdf",
     "status": "vigente",
     "notes": "Código de Comercio"
   },
@@ -61,8 +61,118 @@
     "abbreviation": "LOPDC",
     "category": "fiscal",
     "sourceType": "texto legal",
-    "officialSource": "DOF / Cámara de Diputados",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LOPDC.pdf",
     "status": "vigente",
     "notes": "Ley Orgánica de la PRODECON"
+  },
+  {
+    "id": "07",
+    "filename": "07.txt",
+    "documentName": "Ley Federal del Trabajo",
+    "abbreviation": "LFT",
+    "category": "laboral",
+    "sourceType": "texto legal",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LFT.pdf",
+    "status": "vigente",
+    "notes": "Ley Federal del Trabajo"
+  },
+  {
+    "id": "08",
+    "filename": "08.txt",
+    "documentName": "Ley del Seguro Social",
+    "abbreviation": "LSS",
+    "category": "seguridad social",
+    "sourceType": "texto legal",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LSS.pdf",
+    "status": "vigente",
+    "notes": "Ley del Seguro Social"
+  },
+  {
+    "id": "09",
+    "filename": "09.txt",
+    "documentName": "Código Civil Federal",
+    "abbreviation": "CCF",
+    "category": "civil",
+    "sourceType": "texto legal",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/CCF.pdf",
+    "status": "vigente",
+    "notes": "Código Civil Federal"
+  },
+  {
+    "id": "10",
+    "filename": "10.txt",
+    "documentName": "Ley General de Sociedades Mercantiles",
+    "abbreviation": "LGSM",
+    "category": "mercantil",
+    "sourceType": "texto legal",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LGSM.pdf",
+    "status": "vigente",
+    "notes": "Ley General de Sociedades Mercantiles"
+  },
+  {
+    "id": "11",
+    "filename": "11.txt",
+    "documentName": "Ley Aduanera",
+    "abbreviation": "LA",
+    "category": "aduana",
+    "sourceType": "texto legal",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LAdua.pdf",
+    "status": "vigente",
+    "notes": "Ley Aduanera"
+  },
+  {
+    "id": "12",
+    "filename": "12.txt",
+    "documentName": "Ley Federal de Procedimiento Contencioso Administrativo",
+    "abbreviation": "LFPCA",
+    "category": "administrativo",
+    "sourceType": "texto legal",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPCA.pdf",
+    "status": "vigente",
+    "notes": "Procedimiento Contencioso Administrativo"
+  },
+  {
+    "id": "13",
+    "filename": "13.txt",
+    "documentName": "Ley Federal de Procedimiento Administrativo",
+    "abbreviation": "LFPA",
+    "category": "administrativo",
+    "sourceType": "texto legal",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPA.pdf",
+    "status": "vigente",
+    "notes": "Procedimiento Administrativo"
+  },
+  {
+    "id": "14",
+    "filename": "14.txt",
+    "documentName": "Ley de Firma Electrónica Avanzada",
+    "abbreviation": "LFEA",
+    "category": "tecnología",
+    "sourceType": "texto legal",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LFEA.pdf",
+    "status": "vigente",
+    "notes": "Firma Electrónica Avanzada"
+  },
+  {
+    "id": "15",
+    "filename": "15.txt",
+    "documentName": "Ley del Impuesto Especial sobre Producción y Servicios",
+    "abbreviation": "LIEPS",
+    "category": "fiscal",
+    "sourceType": "texto legal",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LIEPS.pdf",
+    "status": "vigente",
+    "notes": "IEPS"
+  },
+  {
+    "id": "16",
+    "filename": "16.txt",
+    "documentName": "Ley del Instituto del Fondo Nacional de la Vivienda para los Trabajadores",
+    "abbreviation": "LINFONAVIT",
+    "category": "seguridad social",
+    "sourceType": "texto legal",
+    "officialSource": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LIFNVT.pdf",
+    "status": "vigente",
+    "notes": "INFONAVIT"
   }
 ]
