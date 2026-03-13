@@ -41,7 +41,7 @@ export default function LoginPage() {
                     placeholder="tu@email.com"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-text-main mb-2" htmlFor="password">
                     Contraseña

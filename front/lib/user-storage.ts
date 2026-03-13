@@ -5,6 +5,8 @@ export interface User {
     email: string;
     name: string;
     role: UserRole;
+    avatarUrl?: string;
+    googleAvatarUrl?: string | null;
     passwordHash: string;
     createdAt: Date;
 }
@@ -14,6 +16,8 @@ export interface UserSession {
     email: string;
     name: string;
     role: UserRole;
+    avatarUrl?: string;
+    googleAvatarUrl?: string | null;
 }
 
 // Temporary in-memory store for demo/development
@@ -34,4 +38,13 @@ export async function createUser(data: Omit<User, "id" | "createdAt">): Promise<
     };
     users.set(id, user);
     return user;
+}
+
+export async function updateUserAvatar(userId: string, avatarUrl: string): Promise<void> {
+    const user = users.get(userId);
+    if (!user) return;
+    users.set(userId, {
+        ...user,
+        avatarUrl,
+    });
 }

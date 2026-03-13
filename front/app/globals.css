@@ -1,29 +1,62 @@
 @import "tailwindcss";
 
 @theme {
-  /* Colors based on requirements */
-  --color-bg-main: #05070B;
-  --color-bg-sec: #08111F;
-  --color-bg-card: rgba(8, 17, 31, 0.72);
-  
-  --color-cyan-main: #20C4FF;
-  --color-cyan-glow: #53D3FF;
-  
-  --color-text-main: #F5F7FA;
-  --color-text-sec: #A9B4C2;
-  
-  --color-border-glow: rgba(83, 211, 255, 0.18);
+  /* Colores dinámicos basados en variables CSS para Light/Dark Mode */
+  --color-bg-main: var(--bg-main);
+  --color-bg-sec: var(--bg-sec);
+  --color-bg-card: var(--bg-card);
+
+  --color-cyan-main: var(--primary-main);
+  --color-cyan-glow: var(--primary-glow);
+
+  --color-text-main: var(--text-main);
+  --color-text-sec: var(--text-sec);
+
+  --color-border-glow: var(--border-glow);
+  --color-text-glow: var(--text-glow);
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
 @layer base {
+  :root {
+    /* LIGHT MODE: Limpio, blanco, elegante, estilo Vercel/Linear */
+    --bg-main: #f8fafc; /* Slate 50 para el fondo general, da soporte y separa las tarjetas blancas */
+    --bg-sec: #ffffff;  /* Blanco absoluto para sidebar y recuadros superiores */
+    --bg-card: #ffffff; /* Blanco absoluto para tarjetas y bubbles */
+
+    --primary-main: #0ea5e9; /* Cyan oscuro para contraste en fondo blanco */
+    --primary-glow: #38bdf8;
+    
+    --text-main: #0f172a;
+    --text-sec: #475569;
+    
+    --border-glow: rgba(15, 23, 42, 0.08); /* Borde sutil pero definido (+15% vs original) */
+    --text-glow: rgba(14, 165, 233, 0.02); /* Efecto glow apenas perceptible */
+  }
+
+  .dark {
+    /* DARK MODE: Mantiene intacto el diseño actual con sus transparencias */
+    --bg-main: #05070B;
+    --bg-sec: #08111F;
+    --bg-card: rgba(8, 17, 31, 0.72);
+
+    --primary-main: #20C4FF;
+    --primary-glow: #53D3FF;
+
+    --text-main: #F5F7FA;
+    --text-sec: #A9B4C2;
+
+    --border-glow: rgba(83, 211, 255, 0.18);
+    --text-glow: rgba(83, 211, 255, 0.5);
+  }
+
   body {
     background-color: var(--color-bg-main);
     color: var(--color-text-main);
     min-height: 100vh;
   }
-  
+
   /* Smooth scrolling */
   html {
     scroll-behavior: smooth;
@@ -31,6 +64,7 @@
 }
 
 @layer utilities {
+
   /* Premium glassmorphism card */
   .glass-card {
     background-color: var(--color-bg-card);
@@ -38,26 +72,29 @@
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-radius: 1rem;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05); /* Sombra ultra ligera universal */
   }
-  
+
   /* Text glow */
   .glow-text {
     color: var(--color-cyan-main);
-    text-shadow: 0 0 10px rgba(83, 211, 255, 0.5);
+    text-shadow: 0 0 10px var(--color-text-glow);
   }
 
   /* Custom scrollbar for webkit */
   ::-webkit-scrollbar {
     width: 8px;
   }
+
   ::-webkit-scrollbar-track {
     background: var(--color-bg-main);
   }
+
   ::-webkit-scrollbar-thumb {
     background: var(--color-border-glow);
     border-radius: 4px;
   }
+
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-cyan-glow);
   }

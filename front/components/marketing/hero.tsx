@@ -8,8 +8,16 @@ import { Badge } from "../ui/badge";
 import { CheckCircle2 } from "lucide-react";
 
 import { guestLogin } from "@/lib/auth";
+import type { UserSession } from "@/lib/user-storage";
 
-export function Hero({ user }: { user?: any }) {
+interface HeroProps {
+    user?: UserSession | null;
+    forceGuestView?: boolean;
+    hasSession?: boolean;
+}
+
+export function Hero({ user, forceGuestView = false, hasSession = false }: HeroProps) {
+    const showAuthenticatedCta = Boolean(user) && !forceGuestView;
     const trustBullets = [
         "Modo casual y profesional",
         "Enfoque en normativa mexicana",
@@ -54,7 +62,7 @@ export function Hero({ user }: { user?: any }) {
                     transition={{ duration: 0.5, delay: 0.3 }}
                     className="mb-14 flex w-full flex-col space-y-4 sm:w-auto sm:flex-row sm:space-y-0 sm:space-x-4"
                 >
-                    {user ? (
+                    {showAuthenticatedCta ? (
                         <Link href="/chat">
                             <Button size="lg" variant="primary" className="w-full sm:w-auto text-base px-8">
                                 Ir al Chat
@@ -62,11 +70,19 @@ export function Hero({ user }: { user?: any }) {
                         </Link>
                     ) : (
                         <>
-                            <form action={guestLogin}>
-                                <Button size="lg" variant="primary" type="submit" className="w-full sm:w-auto text-base px-8">
-                                    Probar ahora
-                                </Button>
-                            </form>
+                            {hasSession ? (
+                                <Link href="/chat">
+                                    <Button size="lg" variant="primary" className="w-full sm:w-auto text-base px-8">
+                                        Probar ahora
+                                    </Button>
+                                </Link>
+                            ) : (
+                                <form action={guestLogin}>
+                                    <Button size="lg" variant="primary" type="submit" className="w-full sm:w-auto text-base px-8">
+                                        Probar ahora
+                                    </Button>
+                                </form>
+                            )}
                             <Link href="/register">
                                 <Button size="lg" variant="secondary" className="w-full sm:w-auto text-base px-8">
                                     Crear cuenta

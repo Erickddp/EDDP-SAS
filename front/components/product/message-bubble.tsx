@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-    User,
     CheckCircle2,
     AlertCircle,
     FileText,
@@ -17,30 +16,44 @@ import {
     DollarSign,
     Calculator,
     Clock,
-    ArrowRight
+    ArrowRight,
+    Sparkles
 } from "lucide-react";
 import { SourceCard } from "./source-card";
 import { cn } from "@/lib/utils";
-import { StructuredAnswer, SourceReference } from "@/lib/types";
+import { StructuredAnswer, SourceReference, LawArticlePayload, CitationEntry } from "@/lib/types";
 
 interface MessageBubbleProps {
     role: "user" | "assistant" | "system";
     id?: string;
     content: string | StructuredAnswer;
     sources?: SourceReference[];
-    onOpenArticle?: (article: any) => void;
+    onOpenArticle?: (article: LawArticlePayload) => void;
     onRegenerate?: () => void;
+    userAvatarUrl?: string;
+    assistantAvatarUrl?: string;
 }
 
 function normalizeList(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
-    return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+    return value.map(item => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object" && "ref" in (item as any)) return (item as any).ref;
+        return "";
+    }).filter((s): s is string => typeof s === "string" && s.trim().length > 0);
 }
 
 function normalizeStructured(answer: StructuredAnswer) {
     return {
         summary: typeof answer.summary === "string" ? answer.summary : "",
+        summaryCitations: normalizeList(answer.summaryCitations),
         foundation: normalizeList(answer.foundation),
+        foundationCitations: normalizeList(answer.foundationCitations),
+        explanation: typeof answer.explanation === "string" ? answer.explanation : "",
+        explanationCitations: normalizeList(answer.explanationCitations),
+        example: typeof answer.example === "string" ? answer.example : "",
+        exampleCitations: normalizeList(answer.exampleCitations),
+        citations: Array.isArray(answer.citations) ? answer.citations : [],
         scenarios: normalizeList(answer.scenarios),
         consequences: normalizeList(answer.consequences),
         relatedArticles: normalizeList(answer.relatedArticles),
@@ -65,7 +78,15 @@ function normalizeStructured(answer: StructuredAnswer) {
     };
 }
 
-export function MessageBubble({ role, content, sources, onOpenArticle, onRegenerate }: MessageBubbleProps) {
+export function MessageBubble({
+    role,
+    content,
+    sources,
+    onOpenArticle,
+    onRegenerate,
+    userAvatarUrl = "/avatars/avatar-ocean.svg",
+    assistantAvatarUrl = "/icono.png"
+}: MessageBubbleProps) {
     const isUser = role === "user";
     const isSystem = role === "system";
 
@@ -89,13 +110,24 @@ export function MessageBubble({ role, content, sources, onOpenArticle, onRegener
             <div className={cn("flex w-full gap-4", isUser ? "max-w-[85%] sm:max-w-[70%] flex-row-reverse" : "max-w-[100%] sm:max-w-[90%] flex-row")}>
                 <div
                     className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border mt-1",
+                        "relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border mt-1 shadow-sm",
                         isUser
-                            ? "bg-bg-sec border-border-glow text-text-sec"
-                            : "bg-cyan-main/10 border-cyan-main/30 text-cyan-glow shadow-[0_0_15px_rgba(32,196,255,0.1)]"
+                            ? "bg-cyan-main/10 border-cyan-main/30"
+                            : "bg-white dark:bg-bg-sec border-border-glow p-1.5"
                     )}
                 >
-                    {isUser ? <User size={18} /> : <span className="font-bold text-xs">MF</span>}
+                    {!isUser && !assistantAvatarUrl && <span className="text-[10px] font-bold text-cyan-main">AI</span>}
+                    {isUser && !userAvatarUrl && <span className="text-[10px] font-bold text-text-sec">TU</span>}
+                    <img
+                        src={isUser ? userAvatarUrl : assistantAvatarUrl}
+                        alt={isUser ? "Usuario" : "MyFiscal"}
+                        className={cn("h-full w-full object-contain transition-opacity duration-300", !isUser && "p-0.5")}
+                        loading="lazy"
+                        onError={(event: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                            const target = event.currentTarget;
+                            target.style.opacity = "0";
+                        }}
+                    />
                 </div>
 
                 <div className={cn("flex flex-col w-full", isUser ? "items-end" : "items-start")}>
@@ -103,8 +135,8 @@ export function MessageBubble({ role, content, sources, onOpenArticle, onRegener
                         className={cn(
                             "rounded-2xl px-5 py-4 text-[15px] leading-relaxed w-full shadow-sm",
                             isUser
-                                ? "bg-bg-sec border border-border-glow text-text-main rounded-tr-sm"
-                                : "bg-bg-sec/40 border border-border-glow text-text-main rounded-tl-sm backdrop-blur-sm"
+                                ? "bg-cyan-main/12 border border-cyan-main/35 text-text-main rounded-tr-sm shadow-[0_0_20px_rgba(32,196,255,0.08)]"
+                                : "bg-bg-sec border border-border-glow text-text-main rounded-tl-sm shadow-sm"
                         )}
                     >
                         {typeof content === "string" ? (
@@ -135,12 +167,11 @@ function StructuredResponseView({
 }: {
     answer: StructuredAnswer;
     sources?: SourceReference[];
-    onOpenArticle?: (article: any) => void;
+    onOpenArticle?: (article: LawArticlePayload) => void;
     onRegenerate?: () => void;
 }) {
     const data = normalizeStructured(answer);
     const isComplex = !!data.legalInterpretation || data.relatedArticles.length > 0;
-    const isSimple = data.scenarios.length === 0 && data.consequences.length === 0 && !isComplex;
 
     // Detect intent from field presence
     const isMulta = !!data.montoMinimo || !!data.montoMaximo || data.factoresAgravantes.length > 0;
@@ -148,113 +179,169 @@ function StructuredResponseView({
     const isPlazo = !!data.fechaLimite || !!data.periodicidad;
 
     return (
-        <div className="space-y-6">
-            <div className="space-y-2">
-                <h4 className="flex items-center gap-2 text-sm font-bold text-cyan-main uppercase tracking-widest">Sintesis</h4>
-                <p className="text-text-main/90">{data.summary}</p>
+        <div className="space-y-8">
+            {/* 1. SÍNTESIS */}
+            <div className="space-y-3">
+                <h4 className="flex items-center gap-2 text-[11px] font-black text-cyan-main uppercase tracking-[0.2em]">
+                    <Sparkles size={14} className="text-cyan-main/70" /> SÍNTESIS
+                </h4>
+                <div className="rounded-xl bg-white dark:bg-bg-card border border-border-glow shadow-sm p-4 ring-1 ring-cyan-main/5">
+                    <p className="text-[15px] text-text-main/90 leading-relaxed font-medium">{data.summary}</p>
+                    <CitationBlock refs={data.summaryCitations} citations={data.citations} />
+                </div>
             </div>
 
-            {data.foundation.length > 0 && (
-                <div className="space-y-3">
-                    <h4 className="flex items-center gap-2 text-sm font-bold text-cyan-main uppercase tracking-widest">Fundamento principal</h4>
-                    <div className="rounded-xl bg-bg-main/60 border border-border-glow/50 p-4 space-y-2">
-                        {data.foundation.map((f, i) => (
-                            <p key={i} className="text-sm text-text-main leading-relaxed flex gap-2">
-                                <span className="text-cyan-glow opacity-60 mt-1">-</span> {f}
-                            </p>
-                        ))}
+            {/* 2. ANÁLISIS DETALLADO */}
+            {(data.explanation || data.example || isMulta || isCalculo || isPlazo) && (
+                <div className="space-y-4">
+                    <h4 className="flex items-center gap-2 text-[11px] font-black text-cyan-main uppercase tracking-[0.2em]">
+                        <MessageCircle size={14} className="text-cyan-main/70" /> ANÁLISIS DETALLADO
+                    </h4>
+                    
+                    <div className="space-y-4 pl-1">
+                        {data.explanation && (
+                            <div className="rounded-xl bg-bg-main/50 border border-border-glow/50 p-4">
+                                <p className="text-sm text-text-main/90 leading-relaxed whitespace-pre-line">{data.explanation}</p>
+                                <CitationBlock refs={data.explanationCitations} citations={data.citations} />
+                            </div>
+                        )}
+                        
+                        {data.example && (
+                            <div className="rounded-xl bg-teal-500/5 border border-teal-500/20 p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-teal-500" />
+                                    <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">Ejemplo Ilustrativo</span>
+                                </div>
+                                <p className="text-sm text-text-main/90 leading-relaxed whitespace-pre-line">{data.example}</p>
+                                <CitationBlock refs={data.exampleCitations} citations={data.citations} />
+                            </div>
+                        )}
+
+                        {/* Intent Views integrated into Analysis */}
+                        {isMulta && <MultaView data={data} />}
+                        {isCalculo && <CalculoView data={data} />}
+                        {isPlazo && <PlazoView data={data} />}
+
+                        {data.legalInterpretation && (
+                            <div className="rounded-xl bg-purple-500/5 border border-purple-500/20 p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest">Interpretación Técnica</span>
+                                </div>
+                                <p className="text-sm text-text-main leading-relaxed whitespace-pre-line">{data.legalInterpretation}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
 
-            {/* Intent: Multa */}
-            {isMulta && <MultaView data={data} />}
-
-            {/* Intent: Cálculo */}
-            {isCalculo && <CalculoView data={data} />}
-
-            {/* Intent: Plazo */}
-            {isPlazo && <PlazoView data={data} />}
-
-            {data.relatedArticles.length > 0 && (
+            {/* 3. FUNDAMENTO LEGAL */}
+            {(data.foundation.length > 0 || data.relatedArticles.length > 0) && (
                 <div className="space-y-3">
-                    <h4 className="flex items-center gap-2 text-sm font-bold text-amber-400/90 uppercase tracking-widest">Articulos relacionados</h4>
-                    <div className="rounded-xl bg-amber-400/5 border border-amber-400/20 p-4 space-y-2">
-                        {data.relatedArticles.map((art, i) => (
-                            <p key={i} className="text-sm text-text-main leading-relaxed flex gap-2">
-                                <span className="text-amber-400 opacity-60 mt-1">*</span> {art}
-                            </p>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {data.legalInterpretation && (
-                <div className="space-y-3">
-                    <h4 className="flex items-center gap-2 text-sm font-bold text-purple-400/90 uppercase tracking-widest">Interpretacion legal</h4>
-                    <div className="rounded-xl bg-purple-400/5 border border-purple-400/20 p-4">
-                        <p className="text-sm text-text-main leading-relaxed whitespace-pre-line">{data.legalInterpretation}</p>
-                    </div>
-                </div>
-            )}
-
-            {!isSimple && (data.scenarios.length > 0 || data.consequences.length > 0) && (
-                <div className="grid gap-4 sm:grid-cols-2">
-                    {data.scenarios.length > 0 && (
-                        <div className="space-y-2">
-                            <h4 className="text-xs font-bold text-text-sec uppercase tracking-widest">Escenarios / Requisitos</h4>
-                            <ul className="space-y-1.5 list-none">
-                                {data.scenarios.map((s, i) => (
-                                    <li key={i} className="text-xs text-text-sec flex gap-2">
-                                        <CheckCircle2 size={12} className="text-cyan-main mt-0.5 shrink-0" />
-                                        <span>{s}</span>
-                                    </li>
+                    <h4 className="flex items-center gap-2 text-[11px] font-black text-cyan-main uppercase tracking-[0.2em]">
+                        <FileText size={14} className="text-cyan-main/70" /> FUNDAMENTO LEGAL
+                    </h4>
+                    <div className="rounded-xl bg-bg-main border border-border-glow shadow-sm p-5 space-y-4">
+                        {data.foundation.length > 0 && (
+                            <div className="space-y-2">
+                                {data.foundation.map((f, i) => (
+                                    <p key={i} className="text-sm text-text-main leading-relaxed flex gap-3">
+                                        <span className="text-cyan-main font-bold mt-0.5">•</span> 
+                                        <span>{f}</span>
+                                    </p>
                                 ))}
-                            </ul>
-                        </div>
-                    )}
-                    {data.consequences.length > 0 && (
-                        <div className="space-y-2">
-                            <h4 className="text-xs font-bold text-red-400/80 uppercase tracking-widest">Riesgos / Consecuencias</h4>
-                            <ul className="space-y-1.5 list-none">
-                                {data.consequences.map((c, i) => (
-                                    <li key={i} className="text-xs text-text-sec flex gap-2">
-                                        <AlertCircle size={12} className="text-red-400 mt-0.5 shrink-0" />
-                                        <span>{c}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
+                                <CitationBlock refs={data.foundationCitations} citations={data.citations} />
+                            </div>
+                        )}
+
+                        {data.relatedArticles.length > 0 && (
+                            <div className="pt-3 border-t border-border-glow/40">
+                                <p className="text-[10px] font-bold text-text-sec uppercase tracking-widest mb-2 opacity-70">Disposiciones Complementarias</p>
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                    {data.relatedArticles.map((art, i) => (
+                                        <p key={i} className="text-[13px] text-text-sec leading-relaxed flex gap-2 items-center bg-bg-sec/30 p-2 rounded-lg border border-border-glow/30">
+                                            <ArrowRight size={10} className="text-cyan-main/40" /> {art}
+                                        </p>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
+            {/* 4. ESCENARIOS */}
+            {(data.scenarios.length > 0 || data.consequences.length > 0) && (
+                <div className="space-y-3">
+                    <h4 className="flex items-center gap-2 text-[11px] font-black text-cyan-main uppercase tracking-[0.2em]">
+                        <CheckCircle2 size={14} className="text-cyan-main/70" /> ESCENARIOS
+                    </h4>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        {data.scenarios.length > 0 && (
+                            <div className="rounded-xl bg-bg-sec/40 border border-border-glow p-4 space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 size={14} className="text-green-500" />
+                                    <h5 className="text-[10px] font-bold text-text-main uppercase tracking-widest">Requisitos y Condiciones</h5>
+                                </div>
+                                <ul className="space-y-2">
+                                    {data.scenarios.map((s, i) => (
+                                        <li key={i} className="text-[13px] text-text-sec flex gap-2 border-b border-border-glow/20 pb-2 last:border-0 last:pb-0">
+                                            <span className="text-cyan-main/40">•</span>
+                                            <span>{s}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                        {data.consequences.length > 0 && (
+                            <div className="rounded-xl bg-red-500/[0.03] border border-red-500/20 p-4 space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <AlertCircle size={14} className="text-red-500" />
+                                    <h5 className="text-[10px] font-bold text-red-500/80 uppercase tracking-widest">Riesgos y Consecuencias</h5>
+                                </div>
+                                <ul className="space-y-2">
+                                    {data.consequences.map((c, i) => (
+                                        <li key={i} className="text-[13px] text-text-sec flex gap-2 border-b border-red-500/10 pb-2 last:border-0 last:pb-0">
+                                            <span className="text-red-500/40">•</span>
+                                            <span>{c}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* 5. FUENTES CONSULTADAS */}
             {sources && sources.length > 0 && (
-                <div className="pt-4 border-t border-border-glow/30">
-                    <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-xs font-bold text-cyan-main uppercase tracking-widest flex items-center gap-2">
-                            <FileText size={14} /> Fuentes consultadas
+                <div className="space-y-4 pt-6 mt-6 border-t border-border-glow/60">
+                    <div className="flex items-center justify-between">
+                        <h4 className="flex items-center gap-2 text-[11px] font-black text-cyan-main uppercase tracking-[0.2em]">
+                            <Bookmark size={14} className="text-cyan-main/70" /> FUENTES CONSULTADAS
                         </h4>
-                        <span
-                            className={cn(
-                                "text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider",
-                                data.certainty === "Muy Alta" || data.certainty === "Alta"
-                                    ? "bg-green-400/5 text-green-400 border-green-400/20"
-                                    : "bg-yellow-400/5 text-yellow-400 border-yellow-400/20"
-                            )}
-                        >
+                        <div className={cn(
+                            "flex items-center gap-1.5 px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider",
+                            data.certainty === "Muy Alta" || data.certainty === "Alta"
+                                ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+                                : "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20"
+                        )}>
+                            <div className={cn("h-1.5 w-1.5 rounded-full animate-pulse", 
+                                data.certainty === "Muy Alta" || data.certainty === "Alta" ? "bg-green-500" : "bg-yellow-500"
+                            )} />
                             Certeza: {data.certainty}
-                        </span>
+                        </div>
                     </div>
-                    <div className={cn("grid gap-3 mt-3", isSimple ? "grid-cols-1 sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3")}>
+                    <div className="grid gap-3 sm:grid-cols-2">
                         {sources.map((source) => (
                             <SourceCard
                                 key={source.id}
                                 id={source.id}
                                 name={source.title}
                                 type={source.articleRef || source.type}
+                                fragments={source.fragments?.map(f => typeof f === "string" ? f : f.text)}
                                 onView={onOpenArticle}
-                                className="p-3"
+                                className="p-3 bg-white dark:bg-bg-sec hover:border-cyan-main/30 hover:shadow-md transition-all"
                             />
                         ))}
                     </div>
@@ -266,28 +353,52 @@ function StructuredResponseView({
     );
 }
 
+// ─── Citation Component ───────────────────────────────────────────────────
+
+function CitationBlock({ refs, citations }: { refs: string[], citations: CitationEntry[] }) {
+    if (!refs || refs.length === 0 || !citations || citations.length === 0) return null;
+    
+    const matched: CitationEntry[] = refs
+        .map((ref) => citations.find((citation) => citation.ref === ref))
+        .filter((citation): citation is CitationEntry => Boolean(citation));
+    if (matched.length === 0) return null;
+
+    return (
+        <div className="mt-2 space-y-2 border-l-2 border-cyan-glow/30 pl-3 pt-1">
+            {matched.map((c, i) => (
+                <div key={i} className="text-[12px] leading-snug">
+                    <span className={cn("font-bold mr-1.5", c.type === "primary" ? "text-cyan-main" : "text-text-sec")}>
+                        {c.type === "primary" ? "Base:" : "Soporte:"} {c.law} Art. {c.articleNumber}
+                    </span>
+                    <span className="text-text-sec/80 italic">&quot;{c.quote}&quot;</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 // ─── Intent-Specific Card Components ────────────────────────────────────────
 
 function MultaView({ data }: { data: ReturnType<typeof normalizeStructured> }) {
     const hasMonto = data.montoMinimo || data.montoMaximo;
     return (
         <div className="space-y-3">
-            <h4 className="flex items-center gap-2 text-sm font-bold text-amber-400 uppercase tracking-widest">
+            <h4 className="flex items-center gap-2 text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest">
                 <DollarSign size={14} /> Multa / Sanción
             </h4>
-            <div className="rounded-xl bg-amber-400/5 border border-amber-400/20 p-4 space-y-4">
+            <div className="rounded-xl bg-amber-50 dark:bg-amber-400/5 border border-amber-200 dark:border-amber-400/20 p-4 space-y-4 shadow-sm">
                 {hasMonto && (
                     <div className="flex flex-wrap gap-3">
                         {data.montoMinimo && (
-                            <div className="flex-1 min-w-[120px] rounded-lg bg-amber-400/10 border border-amber-400/20 p-3 text-center">
-                                <p className="text-[10px] font-bold text-amber-400/70 uppercase tracking-wider mb-1">Mínimo</p>
-                                <p className="text-lg font-bold text-amber-300">{data.montoMinimo}</p>
+                            <div className="flex-1 min-w-[120px] rounded-lg bg-amber-100 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 p-3 text-center">
+                                <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400/70 uppercase tracking-wider mb-1">Mínimo</p>
+                                <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{data.montoMinimo}</p>
                             </div>
                         )}
                         {data.montoMaximo && (
-                            <div className="flex-1 min-w-[120px] rounded-lg bg-amber-400/10 border border-amber-400/20 p-3 text-center">
-                                <p className="text-[10px] font-bold text-amber-400/70 uppercase tracking-wider mb-1">Máximo</p>
-                                <p className="text-lg font-bold text-amber-300">{data.montoMaximo}</p>
+                            <div className="flex-1 min-w-[120px] rounded-lg bg-amber-100 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 p-3 text-center">
+                                <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400/70 uppercase tracking-wider mb-1">Máximo</p>
+                                <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{data.montoMaximo}</p>
                             </div>
                         )}
                     </div>
@@ -319,10 +430,10 @@ function MultaView({ data }: { data: ReturnType<typeof normalizeStructured> }) {
 function CalculoView({ data }: { data: ReturnType<typeof normalizeStructured> }) {
     return (
         <div className="space-y-3">
-            <h4 className="flex items-center gap-2 text-sm font-bold text-teal-400 uppercase tracking-widest">
+            <h4 className="flex items-center gap-2 text-sm font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">
                 <Calculator size={14} /> Cálculo
             </h4>
-            <div className="rounded-xl bg-teal-400/5 border border-teal-400/20 p-4 space-y-4">
+            <div className="rounded-xl bg-teal-50 dark:bg-teal-400/5 border border-teal-200 dark:border-teal-400/20 p-4 space-y-4 shadow-sm">
                 {data.formula && (
                     <div className="rounded-lg bg-teal-400/10 border border-teal-400/15 p-3">
                         <p className="text-[10px] font-bold text-teal-400/70 uppercase tracking-wider mb-1">Fórmula</p>
@@ -358,7 +469,7 @@ function CalculoView({ data }: { data: ReturnType<typeof normalizeStructured> })
                     </div>
                 )}
                 {data.ejemploNumerico && (
-                    <div className="rounded-lg bg-bg-main/60 border border-border-glow/30 p-3">
+                    <div className="rounded-lg bg-bg-main border border-border-glow p-3 shadow-sm">
                         <p className="text-[10px] font-bold text-text-sec/80 uppercase tracking-wider mb-1">Ejemplo Numérico</p>
                         <p className="text-xs text-text-main leading-relaxed whitespace-pre-line">{data.ejemploNumerico}</p>
                     </div>
@@ -374,18 +485,18 @@ function PlazoView({ data }: { data: ReturnType<typeof normalizeStructured> }) {
             <h4 className="flex items-center gap-2 text-sm font-bold text-blue-400 uppercase tracking-widest">
                 <Clock size={14} /> Plazos y Fechas
             </h4>
-            <div className="rounded-xl bg-blue-400/5 border border-blue-400/20 p-4 space-y-4">
+            <div className="rounded-xl bg-blue-50 dark:bg-blue-400/5 border border-blue-200 dark:border-blue-400/20 p-4 space-y-4 shadow-sm">
                 <div className="flex flex-wrap gap-3">
                     {data.fechaLimite && (
-                        <div className="flex-1 min-w-[160px] rounded-lg bg-blue-400/10 border border-blue-400/20 p-3">
-                            <p className="text-[10px] font-bold text-blue-400/70 uppercase tracking-wider mb-1">Fecha Límite</p>
-                            <p className="text-sm text-blue-200 font-semibold">{data.fechaLimite}</p>
+                        <div className="flex-1 min-w-[160px] rounded-lg bg-blue-100 dark:bg-blue-400/10 border border-blue-200 dark:border-blue-400/20 p-3">
+                            <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400/70 uppercase tracking-wider mb-1">Fecha Límite</p>
+                            <p className="text-sm text-blue-700 dark:text-blue-200 font-semibold">{data.fechaLimite}</p>
                         </div>
                     )}
                     {data.periodicidad && (
-                        <div className="flex-1 min-w-[120px] rounded-lg bg-blue-400/10 border border-blue-400/20 p-3">
-                            <p className="text-[10px] font-bold text-blue-400/70 uppercase tracking-wider mb-1">Periodicidad</p>
-                            <p className="text-sm text-blue-200 font-semibold">{data.periodicidad}</p>
+                        <div className="flex-1 min-w-[120px] rounded-lg bg-blue-100 dark:bg-blue-400/10 border border-blue-200 dark:border-blue-400/20 p-3">
+                            <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400/70 uppercase tracking-wider mb-1">Periodicidad</p>
+                            <p className="text-sm text-blue-700 dark:text-blue-200 font-semibold">{data.periodicidad}</p>
                         </div>
                     )}
                 </div>
@@ -427,7 +538,7 @@ function MessageActions({
         const scenarios = normalized.scenarios.join(", ");
         const consequences = normalized.consequences.join(", ");
 
-        return `SINTESIS: ${normalized.summary}\n\nFUNDAMENTO: ${foundation}\n\nESCENARIOS: ${scenarios}\n\nCONSECUENCIAS: ${consequences}\n\nCERTEZA: ${normalized.certainty}`;
+        return `SÍNTESIS: ${normalized.summary}\n\nANÁLISIS: ${normalized.explanation}\n\nFUNDAMENTO LEGAL: ${foundation}\n\nESCENARIOS: ${scenarios}\n\nCONSECUENCIAS: ${consequences}\n\nCERTEZA: ${normalized.certainty}`;
     };
 
     const buildHtmlReport = (data: StructuredAnswer) => {
@@ -439,11 +550,12 @@ function MessageActions({
         };
 
         return `<h1>MYFISCAL - REPORTE DE CONSULTA</h1>
-            <h3>Sintesis:</h3><p>${normalized.summary}</p>
-            <h3>Fundamento:</h3><ul>${listHtml(normalized.foundation)}</ul>
-            <h3>Escenarios:</h3><ul>${listHtml(normalized.scenarios)}</ul>
-            <h3>Consecuencias:</h3><ul>${listHtml(normalized.consequences)}</ul>
-            <p><b>Certeza:</b> ${normalized.certainty}</p>`;
+            <h3>SÍNTESIS:</h3><p>${normalized.summary}</p>
+            <h3>ANÁLISIS DETALLADO:</h3><p>${normalized.explanation}</p>
+            <h3>FUNDAMENTO LEGAL:</h3><ul>${listHtml(normalized.foundation)}</ul>
+            <h3>ESCENARIOS:</h3><ul>${listHtml(normalized.scenarios)}</ul>
+            <h3>CONSECUENCIAS:</h3><ul>${listHtml(normalized.consequences)}</ul>
+            <p><b>CERTEZA:</b> ${normalized.certainty}</p>`;
     };
 
     const handleCopy = () => {
@@ -462,7 +574,7 @@ function MessageActions({
                     text,
                     url: window.location.href
                 });
-            } catch (_err) {
+            } catch {
                 handleCopy();
             }
         } else {

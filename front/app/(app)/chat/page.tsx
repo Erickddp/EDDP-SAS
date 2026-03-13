@@ -17,13 +17,15 @@ export default function DemoPage() {
     useEffect(() => {
         Storage.seedDemo();
         const savedConvs = Storage.getConversations();
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setConversations(savedConvs);
 
         const savedPrefs = Storage.getPreferences();
         setPrefs(savedPrefs);
 
         if (savedConvs.length > 0) {
-            setActiveId(savedConvs[0].id);
+            const firstActive = savedConvs.find((conversation) => !conversation.archived);
+            setActiveId((firstActive ?? savedConvs[0]).id);
         }
 
         const handleResize = () => {
@@ -44,6 +46,7 @@ export default function DemoPage() {
             title: "Nueva consulta",
             mode: prefs.lastMode,
             detailLevel: prefs.lastDetailLevel,
+            archived: false,
             createdAt: Date.now(),
             updatedAt: Date.now()
         };
@@ -92,6 +95,43 @@ export default function DemoPage() {
         }
     };
 
+    const handleArchiveConversation = (id: string) => {
+        Storage.archiveConversation(id);
+        const updatedConversations = conversations.map((conversation) =>
+            conversation.id === id
+                ? { ...conversation, archived: true, updatedAt: Date.now() }
+                : conversation
+        );
+        setConversations(updatedConversations);
+
+        if (activeId === id) {
+            const nextActive = updatedConversations.find((conversation) => !conversation.archived && conversation.id !== id);
+            setActiveId(nextActive?.id ?? null);
+        }
+    };
+
+    const handleRestoreConversation = (id: string) => {
+        Storage.restoreConversation(id);
+        const updatedConversations = conversations.map((conversation) =>
+            conversation.id === id
+                ? { ...conversation, archived: false, updatedAt: Date.now() }
+                : conversation
+        );
+        setConversations(updatedConversations);
+        setActiveId(id);
+    };
+
+    const handleDeleteConversation = (id: string) => {
+        Storage.deleteConversation(id);
+        const updatedConversations = conversations.filter((conversation) => conversation.id !== id);
+        setConversations(updatedConversations);
+
+        if (activeId === id) {
+            const nextActive = updatedConversations.find((conversation) => !conversation.archived) ?? updatedConversations[0];
+            setActiveId(nextActive?.id ?? null);
+        }
+    };
+
     return (
         <div className="flex h-[100dvh] w-full overflow-hidden bg-bg-main relative mobile-layout-root">
             <GridBg className="opacity-40" />
@@ -103,6 +143,9 @@ export default function DemoPage() {
                 activeId={activeId || undefined}
                 onSelect={handleSelectConversation}
                 onNew={handleNewConversation}
+                onArchive={handleArchiveConversation}
+                onRestore={handleRestoreConversation}
+                onDelete={handleDeleteConversation}
             />
 
             <div className="flex-1 min-w-0 flex flex-col relative z-10 w-full h-[100dvh]">
@@ -120,11 +163,9 @@ export default function DemoPage() {
             {!sidebarOpen && (
                 <button
                     onClick={() => setSidebarOpen(true)}
-                    className="fixed top-4 left-4 z-50 rounded-xl bg-bg-sec border border-border-glow p-3 text-text-sec shadow-2xl md:hidden active:scale-95 transition-all"
+                    className="fixed top-4 left-4 z-50 rounded-xl bg-bg-sec border border-border-glow p-2 text-text-sec shadow-2xl md:hidden active:scale-95 transition-all h-10 w-10 flex items-center justify-center overflow-hidden"
                 >
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-cyan-main">MF</span>
-                    </div>
+                    <img src="/icono.png" alt="Menu" className="h-6 w-6 object-contain" />
                 </button>
             )}
         </div>

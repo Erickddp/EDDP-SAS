@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ModeToggle } from "./mode-toggle";
-import { DetailToggle } from "./detail-toggle";
+import { ChatControls } from "./chat-controls";
+
 import { PromptSuggestions } from "./prompt-suggestions";
 import { MessageBubble } from "./message-bubble";
-import { Send, Sparkles, Loader2, Info } from "lucide-react";
+import { Send, Loader2, Info, UserCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChatMode, DetailLevel, Message, ChatRequest, ChatResponse, Conversation, LawArticlePayload, HistoryMessage } from "@/lib/types";
+import { ChatMode, DetailLevel, Message, ChatRequest, ChatResponse, LawArticlePayload, HistoryMessage, ChatUserProfile } from "@/lib/types";
 import { Storage } from "@/lib/storage";
 import { ArticleViewer } from "./article-viewer";
+import { USER_AVATAR_OPTIONS, resolveEffectiveAvatar } from "@/lib/avatar-options";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 interface ChatWindowProps {
     conversationId: string | null;
@@ -18,6 +20,24 @@ interface ChatWindowProps {
     initialMode: ChatMode;
     initialDetailLevel: DetailLevel;
     onPrefsChange: (mode: ChatMode, level: DetailLevel) => void;
+}
+
+interface SessionAvatarResponse {
+    avatarUrl: string;
+    googleAvatarUrl: string | null;
+    lockedByGoogle: boolean;
+}
+
+function getLatestExchange(messages: Message[]): Message[] {
+    if (messages.length <= 2) return messages;
+
+    const lastUserIndex = [...messages].reverse().findIndex((message) => message.role === "user");
+    if (lastUserIndex === -1) {
+        return messages.slice(-1);
+    }
+
+    const startIndex = messages.length - 1 - lastUserIndex;
+    return messages.slice(startIndex);
 }
 
 export function ChatWindow({
@@ -35,6 +55,12 @@ export function ChatWindow({
     const [isTyping, setIsTyping] = useState(false);
     const [selectedArticle, setSelectedArticle] = useState<LawArticlePayload | null>(null);
     const [isViewerOpen, setIsViewerOpen] = useState(false);
+    const [profile, setProfile] = useState<ChatUserProfile>({
+        avatarUrl: USER_AVATAR_OPTIONS[0].src,
+        googleAvatarUrl: null
+    });
+    const [isAvatarLockedByGoogle, setIsAvatarLockedByGoogle] = useState(false);
+    const [isAvatarSaving, setIsAvatarSaving] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Sync internal state with props
@@ -51,6 +77,35 @@ export function ChatWindow({
             setMessages([]);
         }
     }, [conversationId]);
+
+    useEffect(() => {
+        const localProfile = Storage.getUserProfile();
+        if (localProfile?.avatarUrl) {
+            setProfile((prev) => ({
+                avatarUrl: localProfile.avatarUrl,
+                googleAvatarUrl: localProfile.googleAvatarUrl ?? prev.googleAvatarUrl ?? null
+            }));
+        }
+
+        const syncAvatarProfile = async () => {
+            try {
+                const response = await fetch("/api/session/avatar", { cache: "no-store" });
+                if (!response.ok) return;
+                const payload = await response.json() as SessionAvatarResponse;
+                const nextProfile: ChatUserProfile = {
+                    avatarUrl: payload.avatarUrl,
+                    googleAvatarUrl: payload.googleAvatarUrl ?? null
+                };
+                setProfile(nextProfile);
+                setIsAvatarLockedByGoogle(payload.lockedByGoogle);
+                Storage.saveUserProfile(nextProfile);
+            } catch (error) {
+                console.error("No se pudo sincronizar avatar:", error);
+            }
+        };
+
+        syncAvatarProfile();
+    }, []);
 
     // Auto-scroll
     useEffect(() => {
@@ -72,7 +127,7 @@ export function ChatWindow({
     const sendMessage = async (text: string, isRegenerate = false) => {
         if (!text.trim() || isTyping) return;
 
-        let targetConvId = conversationId;
+        const targetConvId = conversationId;
 
         // Create conversation on the fly if none selected
         if (!targetConvId) {
@@ -181,13 +236,63 @@ export function ChatWindow({
         setIsViewerOpen(true);
     };
 
+    const handleAvatarChange = async (nextAvatarUrl: string) => {
+        if (!nextAvatarUrl || nextAvatarUrl === profile.avatarUrl || isAvatarLockedByGoogle) return;
+
+        const previousProfile = profile;
+        const optimisticProfile: ChatUserProfile = {
+            ...profile,
+            avatarUrl: nextAvatarUrl
+        };
+
+        setProfile(optimisticProfile);
+        Storage.saveUserProfile(optimisticProfile);
+        setIsAvatarSaving(true);
+
+        try {
+            const response = await fetch("/api/session/avatar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ avatarUrl: nextAvatarUrl })
+            });
+
+            if (!response.ok) {
+                throw new Error("No se pudo actualizar el avatar");
+            }
+
+            const payload = await response.json() as SessionAvatarResponse;
+            const nextProfile: ChatUserProfile = {
+                avatarUrl: payload.avatarUrl,
+                googleAvatarUrl: payload.googleAvatarUrl ?? null
+            };
+
+            setProfile(nextProfile);
+            setIsAvatarLockedByGoogle(payload.lockedByGoogle);
+            Storage.saveUserProfile(nextProfile);
+        } catch (error) {
+            console.error(error);
+            setProfile(previousProfile);
+            Storage.saveUserProfile(previousProfile);
+        } finally {
+            setIsAvatarSaving(false);
+        }
+    };
+
+    const effectiveUserAvatar = resolveEffectiveAvatar({
+        avatarUrl: profile.avatarUrl,
+        googleAvatarUrl: profile.googleAvatarUrl,
+        seed: conversationId ?? "chat-user"
+    });
+    const visibleMessages = getLatestExchange(messages);
+    const hiddenCount = Math.max(messages.length - visibleMessages.length, 0);
+
     return (
         <div className="flex h-[100dvh] flex-col bg-bg-main relative w-full overflow-hidden pt-16 md:pt-0">
             <header className="flex-none border-b border-border-glow bg-bg-sec/50 p-4 backdrop-blur-md z-10 w-full transition-all duration-300">
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-main/10 text-cyan-main">
-                            <Sparkles size={16} />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-bg-sec border border-border-glow shadow-sm p-2 overflow-hidden">
+                            <img src="/icono.png" alt="MyFiscal" className="w-full h-full object-contain" />
                         </div>
                         <div>
                             <h1 className="text-sm font-bold text-text-main">Consulta Fiscal MyFiscal</h1>
@@ -196,9 +301,34 @@ export function ChatWindow({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
-                        <ModeToggle mode={mode} onChange={handleModeChange} />
-                        <div className="h-6 w-px bg-border-glow hidden sm:block" />
-                        <DetailToggle level={detail} onChange={handleDetailChange} />
+                        <ThemeToggle />
+                        <div className="flex items-center gap-2 rounded-xl border border-border-glow bg-bg-sec/80 px-2 py-1">
+                            <img
+                                src={effectiveUserAvatar}
+                                alt="Avatar de usuario"
+                                className="h-6 w-6 rounded-full border border-border-glow object-cover"
+                            />
+                            {isAvatarLockedByGoogle ? (
+                                <span className="text-[11px] text-text-sec">Avatar Google</span>
+                            ) : (
+                                <label className="flex items-center gap-1">
+                                    <UserCircle2 size={14} className="text-text-sec" />
+                                    <select
+                                        value={USER_AVATAR_OPTIONS.some((option) => option.src === profile.avatarUrl) ? profile.avatarUrl : USER_AVATAR_OPTIONS[0].src}
+                                        onChange={(event) => handleAvatarChange(event.target.value)}
+                                        disabled={isAvatarSaving}
+                                        className="bg-transparent text-[11px] text-text-main outline-none"
+                                        aria-label="Seleccionar avatar de perfil"
+                                    >
+                                        {USER_AVATAR_OPTIONS.map((option) => (
+                                            <option key={option.id} value={option.src} className="bg-bg-main text-text-main">
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            )}
+                        </div>
                     </div>
                 </div>
             </header>
@@ -215,14 +345,14 @@ export function ChatWindow({
                                 initial={{ opacity: 0, scale: 0.98 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, y: -20 }}
-                                className="flex flex-col items-center justify-center py-12 md:py-24"
+                                className="flex flex-col items-center justify-center pt-10 md:pt-20 pb-24"
                             >
-                                <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-3xl bg-cyan-main/10 border border-cyan-main/20 shadow-[0_0_40px_rgba(32,196,255,0.1)] relative">
-                                    <div className="absolute inset-0 bg-cyan-main/5 blur-xl animate-pulse rounded-full" />
-                                    <span className="text-3xl font-black text-cyan-glow relative z-10">MF</span>
+                                <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-[2rem] bg-white dark:bg-bg-sec border border-border-glow shadow-[0_20px_40px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.3)] relative overflow-hidden group p-4">
+                                    <div className="absolute inset-0 bg-cyan-main/5 blur-2xl group-hover:bg-cyan-main/10 transition-colors" />
+                                    <img src="/icono.png" alt="MyFiscal" className="w-full h-full object-contain relative z-10 transition-transform group-hover:scale-110" />
                                 </div>
-                                <h2 className="mb-3 text-2xl font-bold text-text-main text-center">¿Cómo puedo orientarte hoy?</h2>
-                                <p className="text-text-sec text-sm text-center mb-10 max-w-md leading-relaxed">
+                                <h2 className="mb-3 text-3xl font-extrabold text-text-main text-center tracking-tight">¿Cómo puedo orientarte hoy?</h2>
+                                <p className="text-text-sec text-base text-center mb-10 max-w-lg leading-relaxed">
                                     Haz una consulta sobre IVA, RESICO, declaraciones o multas. Esta demo te mostrará el rigor analítico de MyFiscal.
                                 </p>
                                 <PromptSuggestions onSelect={(p) => {
@@ -235,7 +365,13 @@ export function ChatWindow({
                             </motion.div>
                         ) : (
                             <div className="pb-32">
-                                {messages.map((m) => (
+                                {hiddenCount > 0 && (
+                                    <div className="mb-4 rounded-xl border border-border-glow bg-bg-sec/70 px-4 py-2 text-xs text-text-sec">
+                                        Historial preservado internamente ({hiddenCount} mensaje(s) ocultos). Mostrando solo el intercambio mas reciente.
+                                    </div>
+                                )}
+
+                                {visibleMessages.map((m) => (
                                     <MessageBubble
                                         key={m.id}
                                         role={m.role}
@@ -243,6 +379,8 @@ export function ChatWindow({
                                         sources={m.sources}
                                         onOpenArticle={handleOpenArticle}
                                         onRegenerate={handleRegenerate}
+                                        userAvatarUrl={effectiveUserAvatar}
+                                        assistantAvatarUrl="/icono.png"
                                     />
                                 ))}
 
@@ -252,8 +390,13 @@ export function ChatWindow({
                                         animate={{ opacity: 1, y: 0 }}
                                         className="flex gap-4 max-w-[85%] mb-8"
                                     >
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-main/30 bg-cyan-main/10 text-cyan-glow">
-                                            <Loader2 size={18} className="animate-spin" />
+                                        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border-glow bg-bg-sec">
+                                            <img
+                                                src="/icono.png"
+                                                alt="Avatar MyFiscal"
+                                                className="absolute inset-0 h-full w-full object-cover"
+                                            />
+                                            <Loader2 size={16} className="animate-spin text-cyan-main" />
                                         </div>
                                         <div className="flex flex-col gap-2">
                                             <div className="bg-bg-sec/40 border border-border-glow rounded-2xl rounded-tl-sm px-5 py-4 backdrop-blur-sm">
@@ -263,7 +406,7 @@ export function ChatWindow({
                                                     <span className="h-1.5 w-1.5 rounded-full bg-cyan-main animate-bounce" />
                                                 </div>
                                             </div>
-                                            <p className="text-[10px] text-text-sec uppercase tracking-widest pl-1 animate-pulse">Analizando fundamentación...</p>
+                                            <p className="text-[10px] text-text-sec uppercase tracking-widest pl-1 animate-pulse">Analizando legislación...</p>
                                         </div>
                                     </motion.div>
                                 )}
@@ -275,6 +418,12 @@ export function ChatWindow({
 
             <div className="flex-none p-4 md:p-6 bg-gradient-to-t from-bg-main via-bg-main to-transparent absolute bottom-0 w-full z-10">
                 <div className="mx-auto max-w-4xl relative">
+                    <ChatControls 
+                        mode={mode} 
+                        detail={detail} 
+                        onModeChange={handleModeChange} 
+                        onDetailChange={handleDetailChange} 
+                    />
                     <div className="relative flex items-end overflow-hidden rounded-2xl border border-border-glow bg-bg-sec/90 shadow-2xl backdrop-blur-xl focus-within:border-cyan-main/40 transition-all p-1.5">
                         <textarea
                             className="flex-1 resize-none border-0 bg-transparent py-3 pl-3 pr-14 text-[15px] text-text-main placeholder:text-text-sec focus:outline-none focus:ring-0 min-h-[52px] max-h-32"

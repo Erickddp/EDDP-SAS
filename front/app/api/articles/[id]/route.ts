@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getFullArticlePayload } from "@/lib/law-reader";
+
 import { query } from "@/lib/db";
 import { LawArticlePayload } from "@/lib/types";
 import { getNormalizedArticlePayloadBySourceId, getOfficialPdfUrl } from "@/lib/normalized-retrieval";
@@ -51,6 +51,35 @@ function mapDbRowToPayload(row: DbArticleRow): LawArticlePayload {
 
 async function findArticleInDb(id: string): Promise<LawArticlePayload | null> {
     try {
+        // 1. Intentar búsqueda por ID exacto en la tabla de artículos principal (Fase 2)
+        const { rows } = await query<DbArticleRow>(
+            `SELECT
+                a.id::text AS id,
+                a.document_id,
+                d.document_name,
+                d.abbreviation,
+                a.article_number,
+                a.title,
+                a.text,
+                d.source,
+                d.status,
+                NULL::jsonb AS sections
+             FROM articles a
+             JOIN documents d ON d.id = a.document_id
+             WHERE a.id = $1 OR (d.abbreviation || ':' || a.article_number) = $1
+             LIMIT 1`,
+            [id]
+        );
+
+        if (rows.length > 0) {
+            return mapDbRowToPayload(rows[0]);
+        }
+    } catch (error) {
+        console.warn("Article lookup on primary articles table failed:", error);
+    }
+
+    // 2. Fallback para tabla 'legal_documents' si existe (esquema alternativo detectable)
+    try {
         const { rows } = await query<DbArticleRow>(
             `SELECT
                 l.id::text AS id,
@@ -73,35 +102,7 @@ async function findArticleInDb(id: string): Promise<LawArticlePayload | null> {
             return mapDbRowToPayload(rows[0]);
         }
     } catch (error) {
-        console.warn("Article lookup on legal_documents failed:", error);
-    }
-
-    // Optional fallback for legacy schemas that still have articles/documents.
-    try {
-        const { rows } = await query<DbArticleRow>(
-            `SELECT
-                a.id::text AS id,
-                a.document_id,
-                d.document_name,
-                d.abbreviation,
-                a.article_number,
-                a.title,
-                a.text,
-                d.source,
-                d.status,
-                NULL::jsonb AS sections
-             FROM articles a
-             LEFT JOIN documents d ON d.id = a.document_id
-             WHERE a.id = $1
-             LIMIT 1`,
-            [id]
-        );
-
-        if (rows.length > 0) {
-            return mapDbRowToPayload(rows[0]);
-        }
-    } catch (error) {
-        console.warn("Article lookup on legacy articles/documents failed:", error);
+        // Silencioso si falla la tabla alternativa
     }
 
     return null;
@@ -115,19 +116,16 @@ export async function GET(
         const { id } = await params;
         const decodedId = decodeURIComponent(id);
 
-        const normalizedArticle = getNormalizedArticlePayloadBySourceId(decodedId);
-        if (normalizedArticle) {
-            return NextResponse.json({ article: normalizedArticle });
-        }
-
-        const localArticle = getFullArticlePayload(decodedId);
-        if (localArticle) {
-            return NextResponse.json({ article: localArticle });
-        }
-
+        // 1. Intentar recuperación desde Base de Datos (PostgreSQL) - Prioridad Fase 2
         const dbArticle = await findArticleInDb(decodedId);
         if (dbArticle) {
             return NextResponse.json({ article: dbArticle });
+        }
+
+        // 2. Fallback a fuente normalizada (JSON en memoria)
+        const normalizedArticle = getNormalizedArticlePayloadBySourceId(decodedId);
+        if (normalizedArticle) {
+            return NextResponse.json({ article: normalizedArticle });
         }
 
         return NextResponse.json(
@@ -142,3 +140,4 @@ export async function GET(
         );
     }
 }
+

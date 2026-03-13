@@ -64,7 +64,7 @@ export function HowItWorks() {
                             <p className="max-w-xs text-text-sec text-sm leading-relaxed">
                                 {step.description}
                             </p>
-                            
+
                             {/* Step Number Badge */}
                             <div className="mt-4 inline-flex items-center justify-center rounded-full bg-bg-sec px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-text-sec border border-border-glow">
                                 Paso {i + 1}

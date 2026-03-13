@@ -124,10 +124,18 @@ export function buildRetrievalPlan(
 
     const diversity = computeDiversityExclusions(previousContext, isFollowUp, hasExactRef);
 
-    // Preferred law: from previous context for follow-ups, or null
-    const preferredLaw = (isFollowUp && previousContext)
+    // Preferred law: from previous context for follow-ups, or from query analysis
+    let preferredLaw = (isFollowUp && previousContext)
         ? previousContext.lastLaw
-        : null;
+        : (queryAnalysis.structuredIntent?.topic?.toUpperCase().includes("CFF") ? "CFF" : 
+           queryAnalysis.structuredIntent?.topic?.toUpperCase().includes("IVA") ? "LIVA" :
+           queryAnalysis.structuredIntent?.topic?.toUpperCase().includes("ISR") ? "LISR" : null);
+
+    // If still null, try using first priority law of domain
+    if (!preferredLaw && queryAnalysis.structuredIntent) {
+        // We'd need DOMAIN_PRIORITY here, but it's in legal-authority-ranker.
+        // For now, let's use a simpler heuristic or just rely on detectedIntent.
+    }
 
     // Strategy label
     let strategyLabel = "standard";

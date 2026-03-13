@@ -11,89 +11,53 @@ const target = values.target ? String(values.target).toUpperCase() : undefined;
 async function run() {
   const client = await getClient();
   try {
-    const normalizedDir = path.join(process.cwd(), 'data/legal/normalized');
+    console.log(`🚀 Iniciando generación de embeddings para tabla 'articles'...`);
     
-    if (!fs.existsSync(normalizedDir)) {
-      console.error(`❌ Directorio no encontrado: ${normalizedDir}. Corre 'npm run build:laws' primero.`);
+    // Fetch articles that don't have embeddings yet
+    const { rows: articlesToProcess } = await client.query(`
+      SELECT a.id, a.article_number, a.title, a.text, d.document_name, d.abbreviation
+      FROM articles a
+      JOIN documents d ON d.id = a.document_id
+      WHERE a.embedding IS NULL
+      ${target ? 'AND d.abbreviation = $1' : ''}
+    `, target ? [target] : []);
+
+    if (articlesToProcess.length === 0) {
+      console.log("✅ Todos los artículos ya tienen embeddings o no hay artículos para procesar.");
       return;
     }
 
-    const files = fs.readdirSync(normalizedDir).filter(f => f.endsWith('.json'));
-    
-    for (const file of files) {
-      const filePath = path.join(normalizedDir, file);
-      const contentData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    console.log(`📂 Encontrados ${articlesToProcess.length} artículos sin embedding.`);
+
+    for (const art of articlesToProcess) {
+      const safeText = art.text.length > 15000 ? art.text.substring(0, 15000) + "..." : art.text;
       
-      const { document, articles } = contentData;
-      
-      if (target && document.abbreviation.toUpperCase() !== target) {
-         continue; // skip if doesn't match target
-      }
-
-      console.log(`\n📄 Procesando Documento: ${document.abbreviation} - ${document.documentName}`);
-      console.log(`[1] Limpiando PostgreSQL para ${document.abbreviation}...`);
-      await client.query(`DELETE FROM legal_documents WHERE abbreviation = $1`, [document.abbreviation]);
-
-      // Deduplicar artículos para evitar errores de clave única en la misma transacción
-      const uniqueArticles = new Map();
-      for (const art of articles) {
-        if (!art.text) continue;
-        const key = art.articleNumber;
-        // Si ya existe, nos quedamos con el que tenga texto más largo (probablemente más completo)
-        if (!uniqueArticles.has(key) || art.text.length > uniqueArticles.get(key).text.length) {
-          uniqueArticles.set(key, art);
-        }
-      }
-
-      console.log(`[2] Procesando Embeddings y PG Insert para ${uniqueArticles.size} artículos únicos (de ${articles.length})...`);
-      for (const [artNum, art] of uniqueArticles) {
-        // Truncar texto si es excesivamente largo para evitar error 400 de OpenAI
-        // 8192 tokens es el límite. 15k chars es un límite muy seguro.
-        const safeText = art.text.length > 15000 ? art.text.substring(0, 15000) + "..." : art.text;
-
-        const search_content = `
-Documento: ${document.documentName}
-Abreviatura: ${document.abbreviation}
-Artículo: ${art.articleNumber}
+      const search_content = `
+Documento: ${art.document_name}
+Abreviatura: ${art.abbreviation}
+Artículo: ${art.article_number}
 Contenido:
 ${safeText}
-        `.trim();
+      `.trim();
 
-        console.log(`    Generando embedding para Art. ${art.articleNumber} (${safeText.length} chars)...`);
-        try {
-          const embedding = await generateEmbedding(search_content);
-          const embeddingString = `[${embedding.join(',')}]`;
+      console.log(`    [${art.abbreviation}] Generando embedding para Art. ${art.article_number}...`);
+      
+      try {
+        const embedding = await generateEmbedding(search_content);
+        const embeddingString = `[${embedding.join(',')}]`;
 
-          await client.query(`
-            INSERT INTO legal_documents (
-              document_name, abbreviation, article_number, title, content, search_content, sections, embedding
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT (abbreviation, article_number) DO UPDATE SET
-              document_name = EXCLUDED.document_name,
-              title = EXCLUDED.title,
-              content = EXCLUDED.content,
-              search_content = EXCLUDED.search_content,
-              sections = EXCLUDED.sections,
-              embedding = EXCLUDED.embedding
-          `, [
-            document.documentName,
-            document.abbreviation,
-            art.articleNumber,
-            art.title,
-            art.text,
-            search_content,
-            JSON.stringify(art.sections || []),
-            embeddingString
-          ]);
-        } catch (embedError: any) {
-          console.error(`    ❌ Fallo en Art. ${art.articleNumber}: ${embedError.message}`);
-          // Continuar con el siguiente para no romper todo el pipeline
-        }
+        await client.query(`
+          UPDATE articles 
+          SET embedding = $1::vector
+          WHERE id = $2
+        `, [embeddingString, art.id]);
+        
+      } catch (embedError: any) {
+        console.error(`    ❌ Fallo en Art. ${art.article_number}: ${embedError.message}`);
       }
-      console.log(`✅ Embebido e insertado: ${document.abbreviation}`);
     }
     
-    console.log(`\n🚀 Pipeline completo finalizado.`);
+    console.log(`\n🚀 Generación de embeddings finalizada.`);
   } catch (err) {
     console.error("❌ Error en Ingestión:", err);
   } finally {

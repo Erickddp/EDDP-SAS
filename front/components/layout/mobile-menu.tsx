@@ -8,9 +8,10 @@ import { Button } from "../ui/button";
 interface MobileMenuProps {
     isOpen: boolean;
     onClose: () => void;
+    enterHref?: string;
 }
 
-export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
+export function MobileMenu({ isOpen, onClose, enterHref = "/login" }: MobileMenuProps) {
     return (
         <AnimatePresence>
             {isOpen && (
@@ -64,9 +65,11 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
                                 Chat
                             </Link>
                             <div className="h-px w-full bg-border-glow" />
-                            <Button variant="primary" className="w-full" onClick={onClose}>
-                                Entrar
-                            </Button>
+                            <Link href={enterHref} onClick={onClose}>
+                                <Button variant="primary" className="w-full">
+                                    Entrar
+                                </Button>
+                            </Link>
                         </nav>
                     </motion.div>
                 </>

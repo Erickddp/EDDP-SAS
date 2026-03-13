@@ -17,13 +17,35 @@ export class MockEngine {
         let titleSuggestion: string | undefined;
 
         if (match) {
-            answer = { ...match.answers[mode][detailLevel] };
+            const effectiveMode = mode || "casual";
+            const effectiveDetail = detailLevel || "detallada";
+            const modeAnswers = match.answers[effectiveMode] || match.answers["casual"];
+            answer = { ...(modeAnswers[effectiveDetail] || modeAnswers["detallada"]) };
             sources = [...match.sources];
             titleSuggestion = match.theme;
         } else {
             answer = { ...DEFAULT_ANSWER };
             sources = [];
             titleSuggestion = "Consulta general";
+        }
+
+        // Synthesize Phase 7B fields if missing
+        if (!answer.primaryBasis && (sources.length > 0 || answer.foundation?.[0])) {
+            const firstSource = sources[0];
+            const firstFoundation = Array.isArray(answer.foundation) ? answer.foundation[0] : null;
+            
+            answer.primaryBasis = {
+                ref: firstSource?.articleRef || (typeof firstFoundation === 'string' ? firstFoundation : "Art. principal"),
+                law: firstSource?.title || "Ley General",
+                articleNumber: firstSource?.articleRef?.match(/\d+/)?.[0] || "1",
+                whySelected: "Base jurídica fundamental detectada para la consulta."
+            };
+        }
+        
+        if (!answer.supportingBasis) {
+            answer.supportingBasis = (sources.length > 1) 
+                ? sources.slice(1).map(s => ({ ref: s.articleRef || s.title, role: "correlation" }))
+                : [];
         }
 
         // Add a slight delay to simulate "thinking" to improve UI feel

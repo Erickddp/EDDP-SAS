@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { guestLogin } from "@/lib/auth";
 
-export function PricingPreview() {
+export function PricingPreview({ hasSession = false }: { hasSession?: boolean }) {
     const plans = [
         {
             name: "Invitado",
@@ -130,15 +130,26 @@ export function PricingPreview() {
                                 </ul>
 
                                 {plan.name === "Invitado" ? (
-                                    <form action={guestLogin} className="w-full mt-auto">
-                                        <Button
-                                            variant="secondary"
-                                            type="submit"
-                                            className="w-full border-border-glow hover:border-cyan-main/50"
-                                        >
-                                            {plan.buttonText}
-                                        </Button>
-                                    </form>
+                                    hasSession ? (
+                                        <Link href="/chat" className="w-full mt-auto">
+                                            <Button
+                                                variant="secondary"
+                                                className="w-full border-border-glow hover:border-cyan-main/50"
+                                            >
+                                                {plan.buttonText}
+                                            </Button>
+                                        </Link>
+                                    ) : (
+                                        <form action={guestLogin} className="w-full mt-auto">
+                                            <Button
+                                                variant="secondary"
+                                                type="submit"
+                                                className="w-full border-border-glow hover:border-cyan-main/50"
+                                            >
+                                                {plan.buttonText}
+                                            </Button>
+                                        </form>
+                                    )
                                 ) : (
                                     <Link href={plan.href} className="w-full mt-auto">
                                         <Button

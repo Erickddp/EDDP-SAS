@@ -18,7 +18,13 @@
     "test:memory": "tsx --env-file=.env scripts/test-conversation-memory.ts",
     "test:depth": "tsx --env-file=.env scripts/test-depth-enforcement.ts",
     "test:followup": "tsx --env-file=.env scripts/test-followup-compression.ts",
-    "test:retrieval": "tsx --env-file=.env scripts/test-retrieval.ts"
+    "test:retrieval": "tsx --env-file=.env scripts/test-retrieval.ts",
+    "ingest:laws": "tsx --env-file=.env scripts/ingest-laws.ts",
+    "test:ingestion": "tsx --env-file=.env scripts/test-ingestion.ts",
+    "test:answers": "tsx --env-file=.env scripts/test-answers.ts",
+    "test:citations": "tsx --env-file=.env scripts/test-citations.ts",
+    "test:reasoning": "tsx --env-file=.env scripts/test-reasoning.ts",
+    "test:authority-ranking": "tsx --env-file=.env scripts/test-authority-ranking.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

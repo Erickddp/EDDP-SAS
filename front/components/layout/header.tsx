@@ -8,10 +8,20 @@ import { Button } from "../ui/button";
 import { MobileMenu } from "./mobile-menu";
 import { cn } from "@/lib/utils";
 import { logout } from "@/lib/auth";
+import type { UserSession } from "@/lib/user-storage";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
-export function Header({ user }: { user?: any }) {
+interface HeaderProps {
+    user?: UserSession | null;
+    forceGuestView?: boolean;
+    hasSession?: boolean;
+}
+
+export function Header({ user, forceGuestView = false, hasSession = false }: HeaderProps) {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const showAuthenticatedActions = Boolean(user) && !forceGuestView;
+    const enterHref = hasSession ? "/chat" : "/login";
 
     useEffect(() => {
         const handleScroll = () => {
@@ -35,8 +45,8 @@ export function Header({ user }: { user?: any }) {
                     <div className="flex h-20 items-center justify-between">
                         <div className="flex items-center">
                             <Link href="/" className="flex items-center gap-2">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-main/30 bg-cyan-main/10">
-                                    <span className="text-lg font-bold text-cyan-glow">MF</span>
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border-glow bg-white dark:bg-bg-sec shadow-sm overflow-hidden p-2">
+                                    <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain" />
                                 </div>
                                 <span className="hidden text-xl font-bold tracking-tight text-text-main sm:block">
                                     MyFiscal
@@ -52,10 +62,11 @@ export function Header({ user }: { user?: any }) {
                             <Link href="/#precios" className="text-sm font-medium text-text-sec transition-colors hover:text-cyan-main">
                                 Precios
                             </Link>
-                            {user ? (
+                            <ThemeToggle />
+                            {showAuthenticatedActions ? (
                                 <div className="flex items-center gap-4 ml-4">
                                     <span className="text-sm text-text-sec">
-                                        {user.role === 'guest' ? 'Modo Invitado' : user.name}
+                                        {user?.role === 'guest' ? 'Modo Invitado' : user?.name}
                                     </span>
                                     <Link href="/chat">
                                         <Button variant="outline" size="sm">
@@ -70,7 +81,7 @@ export function Header({ user }: { user?: any }) {
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-2 ml-4">
-                                    <Link href="/login">
+                                    <Link href={enterHref}>
                                         <Button variant="ghost" size="sm">
                                             Entrar
                                         </Button>
@@ -85,7 +96,8 @@ export function Header({ user }: { user?: any }) {
                         </nav>
 
                         {/* Mobile Nav Toggle */}
-                        <div className="md:hidden">
+                        <div className="md:hidden flex items-center gap-2">
+                            <ThemeToggle compact />
                             <button
                                 onClick={() => setMobileMenuOpen(true)}
                                 className="rounded-lg p-2 text-text-sec transition-colors hover:bg-bg-sec hover:text-text-main"
@@ -98,7 +110,7 @@ export function Header({ user }: { user?: any }) {
                 </Container>
             </header>
 
-            <MobileMenu isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
+            <MobileMenu isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} enterHref={enterHref} />
         </>
     );
 }

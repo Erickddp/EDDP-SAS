@@ -184,11 +184,11 @@ async function runTestMatrix() {
     // ─── Optional: Live DB Retrieval Test ────────────────────────────────
     const runLiveDB = process.argv.includes("--live");
     if (runLiveDB) {
-        console.log("\n\n🔌 LIVE DB RETRIEVAL TEST");
+        console.log("\n\n🔌 LIVE DB RETRIEVAL TEST (PostgreSQL Lexical)");
         console.log("─".repeat(60));
         
         try {
-            const { searchArticles } = await import("../lib/vector-search");
+            const { searchPostgresArticles } = await import("../lib/pg-retrieval");
             const { parseLegalReference } = await import("../lib/law-alias");
 
             for (const tc of [TEST_CASES[0], TEST_CASES[4]]) {
@@ -197,18 +197,20 @@ async function runTestMatrix() {
                 const config = RETRIEVAL_CONFIG[analysis.complexity];
                 
                 console.log(`\n  Query: "${tc.query}" → limit=${config.articles}`);
-                const results = await searchArticles(tc.query, config.articles, parsedRef);
-                console.log(`  Retrieved: ${results.length} articles`);
-                results.forEach((r: any, i: number) => {
-                    console.log(`    ${i+1}. ${r.documentAbbreviation} Art. ${r.articleNumber} (sim: ${r.similarity?.toFixed(3)})`);
+                const dbResults = await searchPostgresArticles(tc.query, config.articles, parsedRef);
+                console.log(`  Retrieved: ${dbResults.length} articles from PostgreSQL`);
+                dbResults.forEach((r: any, i: number) => {
+                    console.log(`    ${i+1}. ${r.documentAbbreviation} Art. ${r.articleNumber}`);
                 });
 
-                if (results.length > config.articles) {
-                    console.log(`  ⚠ WARNING: Got more articles (${results.length}) than requested (${config.articles})`);
+                if (dbResults.length === 0) {
+                    console.log("  ⚠️ No se encontraron resultados en PostgreSQL. Verifica que los datos estén cargados.");
+                } else if (dbResults.length > config.articles) {
+                    console.log(`  ⚠ WARNING: Got more articles (${dbResults.length}) than requested (${config.articles})`);
                 }
             }
         } catch (err) {
-            console.error("  DB test failed (expected if no DB connection):", (err as Error).message);
+            console.error("  DB test failed:", (err as Error).message);
         }
     } else {
         console.log("\nTip: Run with --live flag to also test DB retrieval");

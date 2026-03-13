@@ -68,7 +68,7 @@ export function ParticlesBg() {
     return (
         <canvas
             ref={canvasRef}
-            className="pointer-events-none fixed inset-0 z-0 h-full w-full opacity-60"
+            className="pointer-events-none fixed inset-0 z-0 h-full w-full opacity-60 hidden dark:block"
             aria-hidden="true"
         />
     );

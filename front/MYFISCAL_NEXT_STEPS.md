@@ -12,9 +12,9 @@
 # Phase 2 — Production data layer
 - **Goal**: Connect the actual application code to the PostgreSQL (Supabase) database.
 - **Tasks**:
-  1. Deprecate and remove `lib/laws/*.ts` static arrays.
-  2. Rewrite `lib/hybrid-retrieval.ts` to perform standard `SELECT` operations via `lib/db.ts` to fetch articles upon query.
-  3. Ensure `scripts/load-laws.ts` correctly upserts the output of the ingestion pipeline.
+  1. Deprecate and remove `lib/laws/` static arrays and the legacy `lib/hybrid-retrieval.ts`.
+  2. Rewrite `lib/context-builder.ts` to perform standard `SELECT` operations via `lib/db.ts` to fetch articles, deprecating `lib/normalized-retrieval.ts`.
+  3. Ensure `scripts/load-laws.ts` correctly upserts the output of the ingestion pipeline and test data integrity.
 - **Dependencies**: Phase 1.
 - **Expected outcome**: The live chat reads actual database records, paving the way for scalable data management.
 
@@ -54,8 +54,8 @@
 ---
 
 # Immediate next 5 actions
-1. **Refactor Retrieval**: Change `lib/hybrid-retrieval.ts` to execute `SELECT` queries against PostgreSQL instead of mapping over static TS arrays.
+1. **Refactor Retrieval**: Change `lib/context-builder.ts` to execute `SELECT` queries against PostgreSQL instead of loading JSON files into memory via `normalized-retrieval.ts`.
 2. **Generate Embeddings**: Finalize `scripts/build-embeddings.ts` and run it against your PostgreSQL `articles` table to initialize `pgvector`.
-3. **Connect Embeddings to API**: Update the `POST /api/chat` route to use vector similarity for context building.
-4. **Remove Static Law Files**: Safely delete the `lib/laws/cff.ts` (and similar) hardcoded files to ensure the app doesn't accidentally rely on mocked data.
-5. **Implement Rate Limiting**: Add an IP-based or Session-based API rate limit to `/api/chat` to protect against immediate quota exhaustion.
+3. **Connect Embeddings to API**: Update the retrieval process to use vector similarity for context building.
+4. **Remove Legacy Code**: Safely delete the `lib/laws/` hardcoded files and `lib/hybrid-retrieval.ts` to ensure a clean codebase.
+5. **Implement Rate Limiting**: Add an IP-based or Session-based API rate limit to `/api/chat` to protect against immediate OpenAI quota exhaustion.

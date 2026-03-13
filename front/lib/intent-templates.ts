@@ -91,6 +91,7 @@ export const INTENT_TEMPLATES: Record<LegalIntent, IntentTemplate> = {
 - Menciona factores agravantes que pueden incrementar la multa.
 - Si aplica reducción por autocorrección, menciónala.
 - Agrega estos campos adicionales al JSON:
+  "example": "Breve ejemplo práctico numerando un caso donde aplica esta sanción.",
   "montoMinimo": "Monto mínimo de la multa en pesos (ej: $1,810.00). Pon 'No especificado' si no se puede determinar.",
   "montoMaximo": "Monto máximo de la multa en pesos (ej: $22,400.00). Pon 'No especificado' si no se puede determinar.",
   "factoresAgravantes": ["Lista de factores que podrían incrementar la sanción."],
@@ -109,6 +110,7 @@ export const INTENT_TEMPLATES: Record<LegalIntent, IntentTemplate> = {
 - Lista las VARIABLES necesarias para el cálculo.
 - Si es posible, incluye un EJEMPLO NUMÉRICO ilustrativo.
 - Agrega estos campos adicionales al JSON:
+  "example": "Obligatorio: Un ejemplo numérico integrado a la situación.",
   "pasos": ["Paso 1: descripción...", "Paso 2: descripción..."],
   "formula": "Fórmula completa del cálculo.",
   "variables": ["Variable 1: descripción", "Variable 2: descripción"],

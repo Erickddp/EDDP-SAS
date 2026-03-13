@@ -12,14 +12,15 @@ async function updateSchema() {
       CREATE TABLE IF NOT EXISTS legal_documents (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
         document_name TEXT NOT NULL,
-        abbreviation TEXT NOT NULL,
-        article_number TEXT NOT NULL,
+        abbreviation VARCHAR(50) NOT NULL,
+        article_number VARCHAR(50) NOT NULL,
         title TEXT,
         content TEXT NOT NULL,
         search_content TEXT NOT NULL,
-        sections JSONB,
-        embedding vector(1536),
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        sections JSONB, -- Opcional, para almacenar fracciones/incisos estructurados
+        embedding vector(1536), -- Vector de 1536 dimensiones de OpenAI text-embedding-ada-002
+        content_hash TEXT, -- SHA-256 del contenido para detectar cambios
+        last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         UNIQUE(abbreviation, article_number)
       );
     `);

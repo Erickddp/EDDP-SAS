@@ -106,7 +106,7 @@ function loadCorpus(): CorpusState {
         const status = String(document.status || "Vigente");
 
         parsed.articles.forEach((article, index) => {
-            const sourceId = `norm:${documentId}:${index}`;
+            const sourceId = article.id || `norm:${documentId}:${index}`;
             const title = article.title || undefined;
             const text = String(article.text || "");
             const keywords = Array.isArray(article.keywords) ? article.keywords : [];
@@ -146,6 +146,7 @@ function loadCorpus(): CorpusState {
         bySourceId,
         articles: allArticles
     };
+    console.log(`[Retrieval] Loaded corpus: ${allArticles.length} articles from ${files.length} laws`);
 
     return cachedCorpus;
 }
@@ -161,7 +162,8 @@ function inferPreferredLaw(queryNorm: string, topic: string): string | null {
         isr: "LISR",
         resico: "LISR",
         declaraciones: "CFF",
-        multas: "CFF"
+        multas: "CFF",
+        recargos: "CFF"
     };
 
     return topicToLaw[topic] || null;
@@ -186,7 +188,7 @@ function scoreArticle(
     }
 
     if (preferredLaw && article.record.documentAbbreviation === preferredLaw) {
-        score += 24;
+        score += 100; // Stronger boost for preferred law
     }
 
     const lawFilter = parsedRef?.lawAbbreviation || null;
@@ -207,12 +209,16 @@ function scoreArticle(
 
     const normalizedTitle = cleanSearchText(article.record.title || "");
     const normalizedKeywords = cleanSearchText(article.record.keywords.join(" "));
-
     for (const token of tokens) {
         if (token === article.articleNumberNorm) score += 70;
         if (normalizedTitle.includes(token)) score += 16;
         if (normalizedKeywords.includes(token)) score += 12;
-        if (blob.includes(token)) score += 4;
+        const regex = new RegExp(`\\b${token}\\b`, 'i');
+        if (regex.test(blob)) {
+            score += 12; // Precise word match
+        } else if (blob.includes(token)) {
+            score += 4;  // Partial match (e.g. "multas" matches "multa")
+        }
     }
 
     return score;
@@ -220,7 +226,7 @@ function scoreArticle(
 
 export function searchNormalizedArticles(
     query: string, 
-    limit = 4, 
+    limit = 10, 
     parsedRef?: ParsedLegalReference,
     excludeIds: string[] = [],
     preferredLawOverride?: string | null
@@ -264,8 +270,11 @@ export function searchNormalizedArticles(
             article,
             score: scoreArticle(article, queryNorm, tokens, parsedRef, preferredLaw, excludeIds)
         }))
-        .filter((entry) => entry.score > -100)
+        .filter((entry) => entry.score >= -100)
         .sort((a, b) => b.score - a.score);
+
+    console.log(`│ Retrieval: tokens=[${tokens.join(", ")}] | preferred=${preferredLaw} | corpus=${corpus.articles.length} | bestScore=${scored[0]?.score}`);
+    console.log(`│ Top 5 Retrieval: ${scored.slice(0, 5).map(m => `${m.article.record.documentAbbreviation} ${m.article.record.articleNumber} (${m.score})`).join(", ")}`);
 
     if (scored.length === 0) {
         return [];

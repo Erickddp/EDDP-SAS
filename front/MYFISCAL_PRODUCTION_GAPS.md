@@ -1,9 +1,9 @@
 # A. Critical blockers (Preventing Production Release)
 
 ### 1. Disconnected Database Retrieval
-- **Current status**: The live search logic (`lib/hybrid-retrieval.ts` and `lib/legal-search.ts`) relies entirely on static TypeScript arrays imported from `lib/laws/index.ts` (e.g., `CFF_ARTICLES`).
-- **Why it matters**: The app cannot dynamically read updated laws, scale efficiently, or use advanced database indexes. The PostgreSQL infrastructure built via scripts is completely bypassed in production.
-- **Recommended fix**: Rewrite the retrieval methods to query PostgreSQL using the `lib/db.ts` connection pool instead of iterating over the `ALL_LAW_ARTICLES` array.
+- **Current status**: The live search logic (`lib/normalized-retrieval.ts`) relies on loading normalized JSON files (`data/legal/normalized/`) into server memory. It no longer uses static TS arrays, but it still bypasses the database.
+- **Why it matters**: While better than hardcoded arrays, the app cannot dynamically read updated laws from a central source, scale efficiently across serverless functions, or use advanced database indexes (pgvector). The PostgreSQL infrastructure built via scripts is completely bypassed in production.
+- **Recommended fix**: Connect `lib/context-builder.ts` to query PostgreSQL using the `lib/db.ts` connection pool instead of iterating over JSON maps in memory.
 - **Priority**: Critical
 
 ### 2. Missing Vector Embeddings in Live Flow
@@ -13,9 +13,9 @@
 - **Priority**: Critical
 
 ### 3. Missing Production Authentication & User Persistence
-- **Current status**: The auth relies on a basic stateless JWT cookie. There is no live PostgreSQL `users` table managing accounts, quotas, or passwords securely.
+- **Current status**: The auth relies on a basic stateless JWT cookie (`jose`). There is no live PostgreSQL `users` table managing accounts, quotas, or passwords securely.
 - **Why it matters**: You cannot gate premium access, limit usage, or store user chat history permanently without a relational auth system.
-- **Recommended fix**: Integrate Supabase Auth or standard PostgreSQL `user_accounts` and `chat_sessions` tables.
+- **Recommended fix**: Integrate standard PostgreSQL `user_accounts` and `chat_sessions` tables or use Supabase Auth.
 - **Priority**: Critical
 
 ---

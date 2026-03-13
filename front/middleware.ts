@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { decrypt } from "@/lib/session";
 
 const protectedRoutes = ["/chat"];
-const publicRoutes = ["/login", "/register", "/"];
+const authEntryRoutes = ["/login", "/register"];
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const isProtectedRoute = protectedRoutes.some((route) => path.startsWith(route));
-  const isPublicRoute = publicRoutes.includes(path);
+  const isAuthEntryRoute = authEntryRoutes.includes(path);
 
   const cookie = request.cookies.get("session")?.value;
   const session = await decrypt(cookie);
@@ -22,7 +22,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.nextUrl));
   }
 
-  if (isPublicRoute && session && !request.nextUrl.pathname.startsWith("/chat")) {
+  if (isAuthEntryRoute && session) {
     return NextResponse.redirect(new URL("/chat", request.nextUrl));
   }
 

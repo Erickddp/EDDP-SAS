@@ -6,7 +6,7 @@ import { Button } from "../ui/button";
 import Link from "next/link";
 import { guestLogin } from "@/lib/auth";
 
-export function FinalCTA() {
+export function FinalCTA({ hasSession = false }: { hasSession?: boolean }) {
     return (
         <section className="relative overflow-hidden py-24 md:py-32">
             <div className="absolute inset-0 z-0 bg-gradient-to-t from-bg-sec to-bg-main" />
@@ -30,11 +30,19 @@ export function FinalCTA() {
                         Únete a los contadores y empresas que ya están ahorrando tiempo y ganando seguridad jurídica con MyFiscal.
                     </p>
                     <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
-                        <form action={guestLogin}>
-                            <Button size="lg" variant="primary" type="submit" className="w-full sm:w-auto text-lg px-10 h-14">
-                                Probar Gratis como Invitado
-                            </Button>
-                        </form>
+                        {hasSession ? (
+                            <Link href="/chat">
+                                <Button size="lg" variant="primary" className="w-full sm:w-auto text-lg px-10 h-14">
+                                    Probar Gratis como Invitado
+                                </Button>
+                            </Link>
+                        ) : (
+                            <form action={guestLogin}>
+                                <Button size="lg" variant="primary" type="submit" className="w-full sm:w-auto text-lg px-10 h-14">
+                                    Probar Gratis como Invitado
+                                </Button>
+                            </form>
+                        )}
                         <Link href="/register">
                             <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg px-10 h-14 border-cyan-main/30 text-cyan-main">
                                 Crear Cuenta Pro

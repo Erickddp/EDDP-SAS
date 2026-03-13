@@ -25,7 +25,7 @@ export async function searchArticles(query: string, limit: number = 5, filters?:
         console.log(`├───────────────────────────────────────┤`);
         console.log(`│ TOP 5 RESULTADOS POST-BOOSTING:`);
         data.forEach((r, i) => {
-            console.log(`│ ${i+1}. [${r.abbreviation}] Art. ${r.article_number} (Score: ${r.similarity.toFixed(3)})`);
+            console.log(`│ ${i + 1}. [${r.abbreviation}] Art. ${r.article_number} (Score: ${r.similarity.toFixed(3)})`);
         });
         console.log(`└───────────────────────────────────────┘\n`);
 

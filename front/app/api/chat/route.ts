@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { MockEngine } from "@/lib/mock-engine";
-import { ChatRequest, ChatResponse, StructuredAnswer, AdaptiveDebugMeta } from "@/lib/types";
+import { ChatRequest, ChatResponse, StructuredAnswer, AdaptiveDebugMeta, CitationEntry, FoundationEntry } from "@/lib/types";
 import { tokenizeQuery } from "@/lib/legal-search";
 import { buildLegalContext } from "@/lib/context-builder";
 import { openai, OPENAI_MODEL } from "@/lib/openai";
@@ -10,6 +10,9 @@ import { analyzeQueryWithDebug } from "@/lib/query-analyzer";
 import { RETRIEVAL_CONFIG } from "@/lib/retrieval-config";
 import { getConversationContext, updateConversationContext, detectFollowUp } from "@/lib/conversation-context";
 import { buildRetrievalPlan } from "@/lib/retrieval-optimizer";
+import { filterArticlesByRelevance } from "@/lib/article-relevance";
+import { extractArticleFragments } from "@/lib/article-fragment";
+import { rankLegalAuthority, RankedArticle } from "@/lib/legal-authority-ranker";
 
 export async function POST(req: Request) {
     try {
@@ -46,12 +49,12 @@ export async function POST(req: Request) {
             // Legacy follow-up detection (keep for backward compat)
             const lastUserMessage = [...history].reverse().find(m => m.role === "user")?.content;
             const msg = body.message.toLowerCase().trim();
-            const isLegacyFollowUp = msg.startsWith("y ") || 
-                                     msg.startsWith("¿y ") || 
-                                     msg.length < 20 ||
-                                     msg.includes("eso") || 
-                                     msg.includes("esta") || 
-                                     msg.includes("este");
+            const isLegacyFollowUp = msg.startsWith("y ") ||
+                msg.startsWith("¿y ") ||
+                msg.length < 20 ||
+                msg.includes("eso") ||
+                msg.includes("esta") ||
+                msg.includes("este");
             if (isLegacyFollowUp && lastUserMessage) {
                 effectiveQuery = `${lastUserMessage} | Seguimiento: ${body.message}`;
             }
@@ -66,10 +69,15 @@ export async function POST(req: Request) {
         const { analysis: queryAnalysis, debug: queryDebug } = analyzeQueryWithDebug(effectiveQuery, body.mode, body.detailLevel);
         const tierConfig = RETRIEVAL_CONFIG[queryAnalysis.complexity];
 
+        // Ensure token limit supports maxWords requested by depth rule
+        const depthRule = getEffectiveDepthRule(queryAnalysis.detail, followUpResult.isFollowUp);
+        // ~2.5 tokens per word + JSON overhead
+        const safeTokenLimit = Math.max(tierConfig.tokens, Math.floor(depthRule.maxWords * 2.5) + 150);
+
         // Token limit reduction for follow-ups
         const effectiveTokenLimit = followUpResult.isFollowUp
-            ? Math.floor(tierConfig.tokens * FOLLOW_UP_TOKEN_MULTIPLIER)
-            : tierConfig.tokens;
+            ? Math.floor(safeTokenLimit * FOLLOW_UP_TOKEN_MULTIPLIER)
+            : safeTokenLimit;
 
         // 1.5. Build Retrieval Plan (Dynamic Limits, Diversity, Priority)
         const hasExactMatchRef = !!parsedRef.lawAbbreviation && !!parsedRef.articleNumber;
@@ -85,26 +93,101 @@ export async function POST(req: Request) {
         // 2. Obtener contexto legal — context-aware retrieval for follow-ups
         // ──────────────────────────────────────────────────────────────────
         let context;
-        let effectiveRetrievalStrategy = retrievalPlan.strategyLabel;
+        const effectiveRetrievalStrategy = retrievalPlan.strategyLabel;
 
         if (followUpResult.isFollowUp && previousContext) {
             // Context-aware retrieval: use previous law context to guide search
             const enrichedQuery = `${previousContext.lastLaw} ${body.message}`;
             context = await buildLegalContext(
-                enrichedQuery, 
-                parsedRef, 
-                retrievalPlan.effectiveArticleLimit,
+                enrichedQuery,
+                parsedRef,
+                Math.max(8, retrievalPlan.effectiveArticleLimit * 2),
                 retrievalPlan.excludeArticleIds,
                 retrievalPlan.preferredLaw
             );
         } else {
             context = await buildLegalContext(
-                effectiveQuery, 
-                parsedRef, 
-                retrievalPlan.effectiveArticleLimit,
+                effectiveQuery,
+                parsedRef,
+                Math.max(12, retrievalPlan.effectiveArticleLimit * 2),
                 retrievalPlan.excludeArticleIds,
                 retrievalPlan.preferredLaw
             );
+        }
+
+        // 2.5. Apply Legal Intent Relevance Filter
+        if (queryAnalysis.structuredIntent) {
+            const originalCount = context.retrievedArticles.length;
+            context.retrievedArticles = filterArticlesByRelevance(
+                context.retrievedArticles,
+                queryAnalysis.structuredIntent,
+                body.message
+            );
+            
+            // Re-sync sources after filtering
+            context.sources = context.retrievedArticles.map(art => ({
+                id: art.id,
+                title: `${art.documentAbbreviation} Art. ${art.articleNumber}`,
+                type: "Articulo",
+                status: "Vigente",
+                articleRef: `${art.documentAbbreviation} ${art.articleNumber}`,
+                text: art.text,
+                fragments: art.fragments
+            }));
+
+            console.log(`│ Relevance Filter: ${originalCount} → ${context.retrievedArticles.length} articles remaining`);
+        }
+
+        // 2.7. Extract Article Fragments for LLM Context
+        if (queryAnalysis.structuredIntent) {
+            context.retrievedArticles = context.retrievedArticles.map(art => ({
+                ...art,
+                fragments: extractArticleFragments(
+                    art,
+                    queryAnalysis.structuredIntent!,
+                    body.message,
+                    3 // Increased fragment limit
+                )
+            }));
+            console.log(`│ Fragment Extraction: Extracted relevant fragments for ${context.retrievedArticles.length} articles`);
+        }
+
+        // 2.8. Phase 7B: Legal Authority Ranking & Pruning
+        let ranking: any = { 
+            primary: null, 
+            supporting: context.retrievedArticles.slice(0, tierConfig.articles).map(a => ({ article: a, reasons: ["Fallback"], role: "correlation" })), 
+            rejected: [] 
+        };
+
+        if (queryAnalysis.structuredIntent) {
+            console.log(`│ Articles before ranker: ${context.retrievedArticles.map(a => `${a.documentAbbreviation} ${a.articleNumber}`).join(", ")}`);
+            ranking = rankLegalAuthority(
+                body.message,
+                queryAnalysis.structuredIntent,
+                queryAnalysis,
+                context.retrievedArticles,
+                history
+            );
+
+            // Update context with ranked and pruned articles
+            const rankedArticles = [];
+            if (ranking.primary) rankedArticles.push(ranking.primary.article);
+            ranking.supporting.forEach((ra: RankedArticle) => rankedArticles.push(ra.article));
+
+            context.retrievedArticles = rankedArticles;
+            
+            // Re-sync sources after ranking/pruning
+            context.sources = context.retrievedArticles.map(art => ({
+                id: art.id,
+                title: `${art.documentAbbreviation} Art. ${art.articleNumber}`,
+                type: "Articulo",
+                status: "Vigente",
+                articleRef: `${art.documentAbbreviation} ${art.articleNumber}`,
+                text: art.text,
+                fragments: art.fragments
+            }));
+
+            console.log(`│ Authority Ranking: primary=${ranking.primary?.article.id || "none"} supporting=${ranking.supporting.length} rejected=${ranking.rejected.length}`);
         }
 
         // 3. Generar respuesta (OpenAI con fallback a MockEngine)
@@ -116,39 +199,41 @@ export async function POST(req: Request) {
         const retrievalStrategy = hasExactMatch ? 'exact-law-article' : context.retrievalMeta.strategy;
         const finalRetrievalStrategy = effectiveRetrievalStrategy === "context-aware" ? "context-aware" : retrievalStrategy;
 
-        console.log(`[Observability] Estrategia: ${finalRetrievalStrategy} | ExactMatch: ${hasExactMatch ? 'Sí' : 'No'} | Fallback: ${context.retrievalMeta.strategy}`);
-
         if (openai) {
             try {
                 const response = await openai.chat.completions.create({
                     model: OPENAI_MODEL,
                     messages: [
-                        { role: "system", content: buildSystemPrompt({ 
-                            message: body.message, 
-                            mode: body.mode, 
-                            detailLevel: body.detailLevel, 
-                            topic: context.topic, 
-                            legalContext: context.retrievedArticles,
-                            history: body.history,
-                            retrievalStrategy: finalRetrievalStrategy === "context-aware" ? retrievalStrategy : retrievalStrategy,
-                            parsedRef,
-                            queryAnalysis,
-                            isFollowUp: followUpResult.isFollowUp,
-                            previousTopic: previousContext?.lastTopic
-                        }) },
-                        { role: "user", content: buildUserPrompt({ 
-                            message: body.message, 
-                            mode: body.mode, 
-                            detailLevel: body.detailLevel, 
-                            topic: context.topic, 
-                            legalContext: context.retrievedArticles,
-                            history: body.history,
-                            retrievalStrategy,
-                            parsedRef,
-                            queryAnalysis,
-                            isFollowUp: followUpResult.isFollowUp,
-                            previousTopic: previousContext?.lastTopic
-                        }) }
+                        {
+                            role: "system", content: buildSystemPrompt({
+                                message: body.message,
+                                mode: body.mode,
+                                detailLevel: body.detailLevel,
+                                topic: context.topic,
+                                legalContext: context.retrievedArticles,
+                                history: body.history,
+                                retrievalStrategy: finalRetrievalStrategy === "context-aware" ? retrievalStrategy : retrievalStrategy,
+                                parsedRef,
+                                queryAnalysis,
+                                isFollowUp: followUpResult.isFollowUp,
+                                previousTopic: previousContext?.lastTopic
+                            })
+                        },
+                        {
+                            role: "user", content: buildUserPrompt({
+                                message: body.message,
+                                mode: body.mode,
+                                detailLevel: body.detailLevel,
+                                topic: context.topic,
+                                legalContext: context.retrievedArticles,
+                                history: body.history,
+                                retrievalStrategy,
+                                parsedRef,
+                                queryAnalysis,
+                                isFollowUp: followUpResult.isFollowUp,
+                                previousTopic: previousContext?.lastTopic
+                            })
+                        }
                     ],
                     response_format: { type: "json_object" },
                     temperature: 0.2,
@@ -157,10 +242,10 @@ export async function POST(req: Request) {
 
                 const content = response.choices[0].message.content;
                 if (!content) throw new Error("Respuesta de OpenAI vacía");
-                
+
                 answer = JSON.parse(content);
             } catch (err) {
-                console.error("OpenAI Error, falling back to MockEngine:", err);
+                console.error("OpenAI Error:", err);
                 mockResult = await MockEngine.processChat(body, context.topic);
                 answer = mockResult.answer;
             }
@@ -171,77 +256,61 @@ export async function POST(req: Request) {
 
         // 4. Integrar artículos en la respuesta estructurada
         const sources = context.sources.length > 0 ? context.sources : (mockResult?.sources || []);
-        const modelFoundation = Array.isArray(answer.foundation) ? answer.foundation.filter(Boolean) : [];
-        const normalizeRef = (value: string) =>
-            value
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/\s+/g, " ")
-                .trim();
 
-        const sourceRefs = context.retrievedArticles.map((article) =>
-            normalizeRef(`${article.documentAbbreviation} art ${article.articleNumber}`)
-        );
+        // 4.1. Citation Validation & Traceability
+        const retrievedArticleIds = new Set(context.retrievedArticles.map(a => a.id));
+        const validCitations: CitationEntry[] = [];
+        let invalidCitationsRemoved = 0;
 
-        const modelFoundationMatchesSources = modelFoundation.some((line) => {
-            const normalizedLine = normalizeRef(line);
-            return sourceRefs.some((ref) => normalizedLine.includes(ref));
-        });
-
-        const foundation =
-            modelFoundation.length > 0 && modelFoundationMatchesSources
-                ? modelFoundation
-                : (mockResult?.answer.foundation || context.foundation);
-
-        // 5. Sugerencia de título
-        let titleSuggestion = mockResult?.titleSuggestion;
-        if (!titleSuggestion || titleSuggestion === "Consulta general") {
-            if (context.retrievedArticles.length > 0) {
-                titleSuggestion = `Análisis ${context.retrievedArticles[0].documentAbbreviation} Art. ${context.retrievedArticles[0].articleNumber}`;
-            } else if (context.topic !== "general") {
-                titleSuggestion = context.topic.charAt(0).toUpperCase() + context.topic.slice(1);
-            } else {
-                const tokens = tokenizeQuery(body.message).slice(0, 4);
-                if (tokens.length > 0) {
-                    titleSuggestion = tokens.join(" ").charAt(0).toUpperCase() + tokens.join(" ").slice(1);
+        if (Array.isArray(answer.citations)) {
+            answer.citations.forEach((cit: any) => {
+                if (cit.sourceId && retrievedArticleIds.has(cit.sourceId)) {
+                    validCitations.push(cit as CitationEntry);
                 } else {
-                    titleSuggestion = "Consulta Fiscal";
+                    invalidCitationsRemoved++;
                 }
-            }
+            });
+        }
+        
+        answer.citations = validCitations;
+        
+        const primaryCitationsCount = validCitations.filter(c => c.type === "primary").length;
+        const supportingCitationsCount = validCitations.filter(c => c.type === "supporting").length;
+        
+        let traceabilityValidated = false;
+        if (Array.isArray(answer.summaryCitations) && answer.summaryCitations.length > 0) {
+            traceabilityValidated = answer.summaryCitations.some(ref => 
+                validCitations.some(c => c.ref === ref && c.type === "primary")
+            );
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // 6. Update conversation memory for next turn
-        // ──────────────────────────────────────────────────────────────────
-        const primaryLaw = context.retrievedArticles.length > 0
-            ? context.retrievedArticles[0].documentAbbreviation
-            : previousContext?.lastLaw || "general";
-        
-        const sourceLabels = context.retrievedArticles.map(a => 
-            `${a.documentAbbreviation} Art. ${a.articleNumber}`
+        // 4.2 Legacy Foundation 
+        const modelFoundation = Array.isArray(answer.foundation) ? answer.foundation.filter(Boolean) : [];
+        const fallbackFoundationRaw = mockResult?.answer.foundation || context.foundation || [];
+        const foundation = modelFoundation.length > 0 ? modelFoundation : fallbackFoundationRaw.map((item: any) => 
+            typeof item === "string" ? { type: "primary" as const, ref: item } : item
         );
 
-        const articleIds = context.retrievedArticles.map(a => a.id);
+        // 5. Sugerencia de título
+        let titleSuggestion = mockResult?.titleSuggestion || "Consulta Fiscal";
 
+        // 6. Update conversation memory for next turn
         updateConversationContext(
             body.conversationId,
             context.topic,
             queryAnalysis.detectedIntent,
-            sourceLabels,
-            articleIds,
-            primaryLaw,
+            context.retrievedArticles.map(a => `${a.documentAbbreviation} Art. ${a.articleNumber}`),
+            context.retrievedArticles.map(a => a.id),
+            context.retrievedArticles[0]?.documentAbbreviation || "general",
             body.message
         );
 
         // ─── Build debug metadata ────────────────────────────────────────
-        const topSources = context.sources.slice(0, 5).map(s => s.title);
-        const effectiveDepthRule = getEffectiveDepthRule(queryAnalysis.detail, followUpResult.isFollowUp);
         const debugMeta: AdaptiveDebugMeta = {
-            queryDebug: queryDebug,
+            queryDebug,
             retrievalRequested: tierConfig.articles,
             retrievalReturned: context.retrievedArticles.length,
-            topSources,
+            topSources: context.sources.slice(0, 5).map(s => s.title),
             tokenLimit: effectiveTokenLimit,
             promptComplexity: queryAnalysis.complexity,
             promptMode: queryAnalysis.mode,
@@ -251,52 +320,54 @@ export async function POST(req: Request) {
             followUpReason: followUpResult.reason,
             reusedTopic: followUpResult.isFollowUp ? (previousContext?.lastTopic || null) : null,
             depthRulesApplied: true,
-            targetMinWords: effectiveDepthRule.minWords,
-            targetMaxWords: effectiveDepthRule.maxWords,
+            targetMinWords: depthRule.minWords,
+            targetMaxWords: depthRule.maxWords,
             followUpCompressionApplied: followUpResult.isFollowUp,
             compressedTokenLimit: followUpResult.isFollowUp ? effectiveTokenLimit : null,
-            compressedWordLimit: followUpResult.isFollowUp ? effectiveDepthRule.maxWords : null,
+            compressedWordLimit: followUpResult.isFollowUp ? depthRule.maxWords : null,
             retrievedArticlesCount: context.retrievedArticles.length,
             retrievalStrategy: finalRetrievalStrategy,
             articleDiversityApplied: retrievalPlan.diversityApplied,
-            previousArticlesExcluded: retrievalPlan.previousArticlesExcluded
+            previousArticlesExcluded: retrievalPlan.previousArticlesExcluded,
+            responseSections: Object.keys(answer),
+            summaryLength: answer.summary ? answer.summary.split(/\s+/).length : 0,
+            foundationCount: Array.isArray(foundation) ? foundation.length : 0,
+            exampleIncluded: !!answer.example,
+            citationsCount: validCitations.length,
+            primaryCitationsCount,
+            supportingCitationsCount,
+            traceabilityValidated,
+            invalidCitationsRemoved,
+            // Phase 7B
+            authorityRankingApplied: true,
+            primaryBasisRef: ranking.primary?.article.id,
+            primaryBasisLaw: ranking.primary?.article.documentAbbreviation,
+            primaryBasisWhy: ranking.primary?.reasons[0],
+            supportingBasisRefs: ranking.supporting?.map((s: any) => s.article.id),
+            supportingBasisLaws: ranking.supporting?.map((s: any) => s.article.documentAbbreviation),
+            rejectedBasisRefs: ranking.rejected?.map((s: any) => s.article.id),
+            mainPriorityApplied: true,
+            subsectionPrecisionApplied: true
         };
-
-        // Enhanced observability
-        console.log(`\n┌──────── ADAPTIVE ENGINE RESULT ────────┐`);
-        console.log(`│ Retrieval: requested=${tierConfig.articles} returned=${context.retrievedArticles.length}`);
-        console.log(`│ Top Sources: ${topSources.join(", ") || "none"}`);
-        console.log(`│ Token Limit: ${effectiveTokenLimit}${followUpResult.isFollowUp ? ` (compressed from ${tierConfig.tokens})` : ""}`);
-        console.log(`│ Strategy: ${finalRetrievalStrategy}`);
-        console.log(`│ Intent: ${queryAnalysis.detectedIntent}`);
-        console.log(`│ FollowUp: ${followUpResult.isFollowUp} → ${followUpResult.reason}`);
-        console.log(`│ Depth: ${effectiveDepthRule.label} (${effectiveDepthRule.minWords}-${effectiveDepthRule.maxWords} words)`);
-        if (followUpResult.isFollowUp) {
-            console.log(`│ Compression: tokens=${effectiveTokenLimit} words=${effectiveDepthRule.maxWords} sentences=${effectiveDepthRule.maxSentences}`);
-        }
-        if (retrievalPlan.diversityApplied) {
-            console.log(`│ Diversity: applied=true (excluded ${retrievalPlan.previousArticlesExcluded} articles)`);
-        }
-        console.log(`└────────────────────────────────────────┘`);
 
         const chatResponse: ChatResponse = {
             answer: {
                 ...answer,
                 foundation,
-                certainty: context.retrievedArticles.length > 0
-                    ? `Basado en ${context.retrievedArticles.length} artículo(s)`
-                    : answer.certainty || "Referencia normativa",
-                disclaimer: answer.disclaimer || "Esta respuesta se basa en análisis automatizado de artículos fiscales. No sustituye asesoría fiscal profesional."
+                certainty: answer.certainty || (context.retrievedArticles.length > 0 ? `Basado en ${context.retrievedArticles.length} artículo(s)` : "Referencia normativa"),
+                disclaimer: answer.disclaimer || "Esta respuesta se basa en análisis automatizado de artículos fiscales."
             },
-            sources,
+            sources: context.sources,
             titleSuggestion,
             queryAnalysis,
             _debug: debugMeta
         };
 
-        return NextResponse.json(chatResponse);
-    } catch (error) {
+        const finalResponse = { ...chatResponse, _debug: debugMeta };
+        console.log(`│ API Response: ${chatResponse.answer.primaryBasis?.ref || "no primary"} | primaryBasisLaw: ${debugMeta.primaryBasisLaw}`);
+        return NextResponse.json(finalResponse);
+    } catch (error: any) {
         console.error("Chat API Error:", error);
-        return NextResponse.json({ error: "Error procesando la consulta fiscal" }, { status: 500 });
+        return NextResponse.json({ error: "Error procesando la consulta fiscal", details: error instanceof Error ? error.message : "Desconocido" }, { status: 500 });
     }
 }

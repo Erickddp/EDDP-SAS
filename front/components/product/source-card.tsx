@@ -2,17 +2,19 @@
 
 import { FileText, ExternalLink, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
+import { LawArticlePayload } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface SourceCardProps {
     id: string;
     name: string;
     type: string;
+    fragments?: string[];
     className?: string;
-    onView?: (article: any) => void;
+    onView?: (article: LawArticlePayload) => void;
 }
 
-export function SourceCard({ id, name, type, className, onView }: SourceCardProps) {
+export function SourceCard({ id, name, type, fragments, className, onView }: SourceCardProps) {
     const [isLoading, setIsLoading] = useState(false);
 
     const handleViewArticle = async () => {
@@ -26,7 +28,11 @@ export function SourceCard({ id, name, type, className, onView }: SourceCardProp
             const data = await response.json();
             if (!data?.article) throw new Error("Respuesta de articulo invalida");
 
-            onView(data.article);
+            // Inject fragments into the article object
+            onView({
+                ...data.article,
+                fragments: fragments || []
+            });
         } catch (error) {
             console.error("Error loading article:", error);
         } finally {

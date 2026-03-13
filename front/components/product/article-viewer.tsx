@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { X, FileText, Bookmark, Info, Calendar, ExternalLink } from "lucide-react";
@@ -122,10 +122,11 @@ function parseLegalBlocks(text: string): LegalBlock[] {
 export function ArticleViewer({ article, isOpen, onClose }: ArticleViewerProps) {
     const [isFavorite, setIsFavorite] = useState(false);
 
+    const articleText = article?.text;
     const legalBlocks = useMemo(() => {
-        if (!article?.text) return [];
-        return parseLegalBlocks(article.text);
-    }, [article?.text]);
+        if (!articleText) return [];
+        return parseLegalBlocks(articleText);
+    }, [articleText]);
 
     if (!article && isOpen) return null;
 
@@ -201,6 +202,12 @@ export function ArticleViewer({ article, isOpen, onClose }: ArticleViewerProps) 
                                 <div className="relative space-y-4">
                                     {legalBlocks.length > 0 ? (
                                         legalBlocks.map((block, idx) => {
+                                            const isHighlighted = article.fragments?.some(f => {
+                                                const fText = typeof f === "string" ? f : f.text;
+                                                return block.text.toLowerCase().includes(fText.toLowerCase()) || 
+                                                       fText.toLowerCase().includes(block.text.toLowerCase());
+                                            });
+
                                             if (block.kind === "heading") {
                                                 return (
                                                     <h4 key={idx} className="text-xs font-bold uppercase tracking-[0.14em] text-cyan-main/90 pt-3">
@@ -211,17 +218,35 @@ export function ArticleViewer({ article, isOpen, onClose }: ArticleViewerProps) 
 
                                             if (block.kind === "item") {
                                                 return (
-                                                    <div key={idx} className="flex gap-3 rounded-xl border border-border-glow/40 bg-bg-main/35 px-4 py-3">
-                                                        <span className="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-cyan-main/40 bg-cyan-main/10 px-2 text-[11px] font-bold text-cyan-main">
+                                                    <div key={idx} className={cn(
+                                                        "flex gap-3 rounded-xl border px-4 py-3 transition-all",
+                                                        isHighlighted 
+                                                            ? "border-cyan-main bg-cyan-main/10 shadow-[0_0_15px_rgba(32,196,255,0.1)] scale-[1.02] z-10" 
+                                                            : "border-border-glow/40 bg-bg-main/35"
+                                                    )}>
+                                                        <span className={cn(
+                                                            "mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full border px-2 text-[11px] font-bold",
+                                                            isHighlighted 
+                                                                ? "border-bg-main bg-cyan-main text-bg-main" 
+                                                                : "border-cyan-main/40 bg-cyan-main/10 text-cyan-main"
+                                                        )}>
                                                             {block.marker}
                                                         </span>
-                                                        <p className="text-[17px] leading-8 text-text-main/90">{block.text}</p>
+                                                        <p className={cn(
+                                                            "text-[17px] leading-8",
+                                                            isHighlighted ? "text-text-main font-semibold" : "text-text-main/90"
+                                                        )}>{block.text}</p>
                                                     </div>
                                                 );
                                             }
 
                                             return (
-                                                <p key={idx} className="text-[17px] leading-8 text-text-main/90 font-medium">
+                                                <p key={idx} className={cn(
+                                                    "text-[17px] leading-8 font-medium transition-all",
+                                                    isHighlighted 
+                                                        ? "text-cyan-glow bg-cyan-main/5 px-2 rounded-lg border-l-2 border-cyan-main" 
+                                                        : "text-text-main/90"
+                                                )}>
                                                     {block.text}
                                                 </p>
                                             );

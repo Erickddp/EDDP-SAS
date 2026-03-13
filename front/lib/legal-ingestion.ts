@@ -21,6 +21,7 @@ export interface NormalizedArticle {
   title: string | null;
   text: string;
   keywords: string[];
+  hash?: string; // SHA-256 for change detection
 }
 
 export interface NormalizedDocument {
@@ -52,14 +53,20 @@ export function cleanText(text: string): string {
     .trim();
 }
 
+import crypto from 'crypto';
+
 /**
  * Basic keyword extraction (initial version).
  */
 export function extractKeywords(text: string): string {
-  // Simple extraction of capitalized words or predefined fiscal/legal terms
-  // For now, we leave it simple or returning empty as requested if not reliable.
-  // Returning empty array as per "if not reliable, leave []".
   return "";
+}
+
+/**
+ * Generates SHA-256 hash for article text to detect updates.
+ */
+export function generateContentHash(text: string): string {
+  return crypto.createHash('sha256').update(text).digest('hex');
 }
 
 /**
@@ -106,9 +113,13 @@ export function parseArticles(docId: string, text: string): NormalizedArticle[] 
     let articleText = cleanedText.substring(start, end).trim();
     
     // Attempt to extract title from first line if it's not too long
+    // Also remove optional leading spaces or formatting characters like .- 
+    articleText = articleText.replace(/^[\.\- ]+/, ""); 
     const lines = articleText.split('\n');
     let title: string | null = null;
-    if (lines[0] && lines[0].length < 100 && lines[0].toUpperCase() === lines[0]) {
+    
+    // If first line exists, is short enough, and doesn't look like regular text (e.g. capitalized, or ending with dot)
+    if (lines[0] && lines[0].length < 150 && (lines[0] === lines[0].toUpperCase() || lines[0].endsWith('.') || lines[0].endsWith(':'))) {
       title = lines[0].trim();
       articleText = lines.slice(1).join('\n').trim();
     }
@@ -118,7 +129,8 @@ export function parseArticles(docId: string, text: string): NormalizedArticle[] 
       articleNumber: current.number,
       title,
       text: articleText,
-      keywords: []
+      keywords: [],
+      hash: generateContentHash(articleText)
     });
   }
 

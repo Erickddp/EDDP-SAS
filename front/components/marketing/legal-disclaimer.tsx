@@ -14,8 +14,8 @@ export function LegalDisclaimer() {
                     <div>
                         <h4 className="text-yellow-500 font-bold mb-1 uppercase tracking-wider text-xs">Aviso Legal Importante</h4>
                         <p className="text-text-sec text-sm leading-relaxed italic">
-                            MyFiscal es una herramienta de orientación basada en inteligencia artificial y recuperación normativa. 
-                            <strong> No constituye asesoría fiscal, contable o legal definitiva.</strong> Los resultados dependen de la vigencia de las normas y el contexto proporcionado. 
+                            MyFiscal es una herramienta de orientación basada en inteligencia artificial y recuperación normativa.
+                            <strong> No constituye asesoría fiscal, contable o legal definitiva.</strong> Los resultados dependen de la vigencia de las normas y el contexto proporcionado.
                             Recomendamos siempre validar las conclusiones con un profesional certificado antes de la toma de decisiones críticas.
                         </p>
                     </div>

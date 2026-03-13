@@ -12,19 +12,20 @@ import { getSession } from "@/lib/session";
 
 export default async function MarketingPage() {
     const user = await getSession();
+    const hasSession = Boolean(user);
 
     return (
         <>
-            <Header user={user} />
+            <Header user={user} forceGuestView hasSession={hasSession} />
             <main className="flex-1 relative w-full">
-                <Hero user={user} />
+                <Hero user={user} forceGuestView hasSession={hasSession} />
                 <HowItWorks />
                 <Benefits />
                 <UseCases />
-                <PricingPreview />
+                <PricingPreview hasSession={hasSession} />
                 <FAQ />
                 <Waitlist />
-                <FinalCTA />
+                <FinalCTA hasSession={hasSession} />
                 <LegalDisclaimer />
             </main>
             <footer className="border-t border-border-glow bg-bg-main py-8 text-center text-sm text-text-sec z-10 relative">

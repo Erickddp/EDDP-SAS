@@ -1,15 +1,15 @@
 # A. Executive summary
-MyFiscal currently stands as an **Advanced MVP**. It features a polished Next.js App Router front-end, a structured chat interface, and a well-designed internal framework for retrieving legal context. However, under the hood, the live application relies on hardcoded static data rather than its database, and it utilizes OpenAI with a robust but static fallback ("MockEngine") for safety. 
+MyFiscal currently stands as an **Advanced MVP (Pre-Release)**. It features a polished Next.js App Router front-end, a structured chat interface, and a well-designed internal framework for retrieving legal context. Under the hood, the live application relies on JSON files loaded into memory for legal retrieval (transitioning away from hardcoded TypeScript arrays). It utilizes OpenAI (`gpt-4o`) as the primary intelligence engine for structured JSON responses, with a robust static fallback ("MockEngine") for safety and timeouts.
 
 # B. Current architecture
 - **Public layer**: React Server Components handling marketing routes (`/`) and authentication entry points (`/login`, `/register`).
 - **Auth/access layer**: A lightweight, JWT-based authentication layer (using `jose`) controlled via Next.js `middleware.ts` to protect routes.
-- **Product/chat layer**: The core user interface (`/chat`) that handles state, memory, and prompts.
-- **API layer**: A single endpoint (`/api/chat/route.ts`) bridging the client UI with the retrieval generation cycle.
-- **Legal retrieval layer**: A hybrid RAG approach relying on keyword + basic semantic rules (`lib/hybrid-retrieval.ts` and `lib/legal-search.ts`). *Currently offline/static.*
+- **Product/chat layer**: The core user interface (`/chat`) that handles state, formatting (citations), and real-time interaction.
+- **API layer**: A single endpoint (`/api/chat/route.ts`) bridging the client UI with the retrieval generation cycle. Maneja memoria conversacional e intención de usuario.
+- **Legal retrieval layer**: A context-aware RAG approach relying on keyword, deterministic law-article matching, and memory extensions (`lib/normalized-retrieval.ts`, `lib/context-builder.ts`). *Currently queries JSON files in memory.*
 - **Data ingestion layer**: Scripts to parse raw `.txt` files driven by a `manifest.json` into structured, normalized `.json` arrays.
-- **Database layer**: PostgreSQL schema and connection structure (`pg`), heavily scripted for setup and data loading, but completely detached from the live UI.
-- **AI/LLM layer**: OpenAI integration (`gpt-4o`/`gpt-4o-mini`) tasked to act based on context, gracefully degrading to `MockEngine` upon failure or timeout.
+- **Database layer**: PostgreSQL schema and connection structure (`pg`), heavily scripted (`scripts/setup-db.ts`, `scripts/load-laws.ts`) but currently detached from the live UI.
+- **AI/LLM layer**: OpenAI integration (`gpt-4o`) tasked to act based on context, utilizing dynamic token limits and complexity depth rules (`lib/llm-prompt.ts`), gracefully degrading to `MockEngine` upon failure.
 
 # C. Route map
 - `/` - Marketing Landing Page (Public)
@@ -27,10 +27,12 @@ MyFiscal currently stands as an **Advanced MVP**. It features a polished Next.js
 
 # E. Backend/service map
 - `lib/db.ts`: PostgreSQL connection pool.
-- `lib/hybrid-retrieval.ts`: Core search, scoring, and ranking logic.
-- `lib/legal-search.ts`: Lexical search and NLP parsing helpers.
-- `lib/legal-ingestion.ts`: Parsing engine to extract articles from raw `.txt`.
-- `lib/laws.ts` & `lib/laws/`: **Hardcoded TS files** holding the active data.
+- `lib/normalized-retrieval.ts`: Core retrieval engine reading `data/legal/normalized/` JSONs into RAM memory for search.
+- `lib/context-builder.ts`: Orchestrator for building retrieval context objects.
+- `lib/query-analyzer.ts`: Analyzes user query for complexity, intent, and structuring logic.
+- `lib/conversation-context.ts`: In-memory state tracking to detect follow-ups and preserve topics.
+- `lib/legal-authority-ranker.ts`: Classifies retrieved articles into primary, supporting, or rejected sources.
+- `lib/hybrid-retrieval.ts` & `lib/laws.ts`: **Deprecated/Legacy** TS fallback files and logic.
 - `lib/mock-engine.ts`: Hardcoded knowledge base and logic to bypass OpenAI when needed.
 - `lib/auth.ts` / `session.ts`: JWT management.
 - `scripts/build-laws.ts`: Script converting TXT via `manifest.json` to JSON.
@@ -40,16 +42,16 @@ MyFiscal currently stands as an **Advanced MVP**. It features a polished Next.js
 # F. Data flow map
 1. **Raw text ingestion**: `manifest.json` + `data/legal/raw/*.txt` ➡️ `scripts/build-laws.ts` ➡️ `data/legal/normalized/*.json`.
 2. **Database loading (Offline)**: `data/legal/normalized/*.json` ➡️ `scripts/load-laws.ts` ➡️ PostgreSQL `documents` & `articles` tables.
-3. **Live Chat Request**: `UI` ➡️ `POST /api/chat` ➡️ `hybrid-retrieval.ts` (queries **static TS arrays**, NOT PostgreSQL) ➡️ Context passed to OpenAI ➡️ JSON Response ➡️ `UI`.
+3. **Live Chat Request**: `UI` ➡️ `POST /api/chat` ➡️ `normalized-retrieval.ts` (queries **JSON files in memory**, NOT PostgreSQL) ➡️ Filtering & Authority Ranking ➡️ Context passed to OpenAI (`gpt-4o`) ➡️ Structured JSON Response ➡️ `UI`.
 4. **Auth flow**: Login ➡️ Formulates JWT `Session Cookie` ➡️ `middleware.ts` intercepts `/chat` to enforce access.
 
 # G. Current storage map
-- **Memory/Static Code**: `ALL_LAW_ARTICLES` exported from `lib/laws/index.ts` serves all live data to the app. 
-- **JSON files**: `data/legal/normalized/` acts as an intermediate artifact map.
-- **PostgreSQL/Supabase**: Tables (`documents`, `articles`) exist and are populated via offline scripts, but are **not queried by the live application**.
+- **JSON files**: `data/legal/normalized/` acts as the primary data source, loaded into memory upon initialization in `normalized-retrieval.ts`.
+- **Memory/Static Code**: Legacy `ALL_LAW_ARTICLES` exported from `lib/laws/index.ts` is in process of deprecation.
+- **PostgreSQL/Supabase**: Tables (`documents`, `articles`) exist and are populated via offline scripts, but are **not queried by the live chat application**.
 - **Env variables**: `.env` stores the critical values (`DATABASE_URL`, `OPENAI_API_KEY`).
 - **Cookies**: Session tokens.
 
 # H. Current production readiness level
-**Level: Advanced MVP**
-The project is structurally excellent on the frontend, possessing realistic UI states, middleware protection, and error-handling fallbacks. However, technically, the "brain" of the app is mocked. The data retrieval is hardcoded to static TypeScript arrays rather than the live PostgreSQL database, and there are no actual pgvector embeddings operating in the chat API. It requires a database wiring phase before being production-stable for real users.
+**Level: Advanced MVP (Pre-Release)**
+The project is structurally excellent on the frontend, possessing realistic UI states, middleware protection, advanced intent classification, conversational memory, and robust error-handling fallbacks. Technically, the "brain" of the app is fully operational via OpenAI. However, the data retrieval is fundamentally an in-memory search over JSON maps. Although significantly better than static TS arrays, it still lacks `pgvector` semantic matching capabilities and does not query the live PostgreSQL database. It requires one final database-wiring phase (connecting `context-builder` to pg) before being considered 100% production-stable and scalable.

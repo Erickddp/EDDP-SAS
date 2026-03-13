@@ -8,6 +8,7 @@
 import { ChatMode, DetailLevel, QueryAnalysis } from "./types";
 import { RETRIEVAL_CONFIG } from "./retrieval-config";
 import { detectIntent, LegalIntent } from "./intent-templates";
+import { extractStructuredIntent } from "./legal-intent";
 
 // ─── Debug info interface ───────────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ export interface QueryDebugInfo {
     finalComplexity: string;
     elevatedByUser: boolean;
     detectedIntent: LegalIntent;
+    structuredIntent: import("./types").StructuredIntent;
 }
 
 export interface QueryAnalysisWithDebug {
@@ -139,7 +141,7 @@ function resolveComplexityAndDetail(
     let detail = detailMap[complexity];
     if (userDetailLevel === "tecnica") detail = "technical";
     else if (userDetailLevel === "detallada") detail = "detailed";
-    else if (userDetailLevel === "sencilla" && complexity === "simple") detail = "simple";
+    else if (userDetailLevel === "sencilla") detail = "simple";
 
     const mode: QueryAnalysis["mode"] = userMode === "profesional" ? "professional" : "casual";
 
@@ -174,6 +176,7 @@ export function analyzeQueryWithDebug(
 
     // Detect intent
     const detectedIntent = detectIntent(query);
+    const structuredIntent = extractStructuredIntent(query, detectedIntent);
 
     const analysis: QueryAnalysis = {
         complexity: resolved.complexity,
@@ -181,7 +184,8 @@ export function analyzeQueryWithDebug(
         detail: resolved.detail,
         retrievalDepth: resolved.config.articles,
         tokenLimit: resolved.config.tokens,
-        detectedIntent
+        detectedIntent,
+        structuredIntent
     };
 
     const debug: QueryDebugInfo = {
@@ -198,7 +202,8 @@ export function analyzeQueryWithDebug(
         heuristicComplexity: resolved.heuristicComplexity,
         finalComplexity: resolved.complexity,
         elevatedByUser: resolved.elevatedByUser,
-        detectedIntent
+        detectedIntent,
+        structuredIntent
     };
 
     // Observability
@@ -209,7 +214,8 @@ export function analyzeQueryWithDebug(
     console.log(`│ Matched KW: [${scores.matchedKeywords.slice(0, 5).join(", ")}${scores.matchedKeywords.length > 5 ? "..." : ""}]`);
     console.log(`│ Matched PH: [${scores.matchedPhrases.join(", ")}]`);
     console.log(`│ Config → articles: ${resolved.config.articles} | tokens: ${resolved.config.tokens} | detail: ${resolved.detail} | mode: ${resolved.mode}`);
-    console.log(`│ Intent: ${detectedIntent}`);
+    console.log(`│ Intent: ${detectedIntent} | Domain: ${structuredIntent.legalDomain} | Type: ${structuredIntent.intentType}`);
+    console.log(`│ Topic: ${structuredIntent.topic} | Entities: [${structuredIntent.entities.join(", ")}]`);
     console.log(`└───────────────────────────────┘`);
 
     return { analysis, debug };

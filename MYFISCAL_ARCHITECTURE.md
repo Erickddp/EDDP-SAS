@@ -5,12 +5,12 @@
 MyFiscal es un motor de análisis jurídico-fiscal diseñado para proporcionar orientación estructurada basada en el marco normativo mexicano (CFF, LISR, LIVA).
 
 ### Flujo de Datos Actual:
-1. **Usuario**: Envía consulta vía Chat UI.
-2. **Chat API**: Recibe la solicitud y activa el motor de recuperación.
-3. **Hybrid Retrieval**: Combina búsqueda por palabras clave y expansión de sinónimos legales.
-4. **Context Builder**: Construye un bloque de contexto con los artículos más relevantes.
-5. **MockEngine**: Procesa el mensaje del usuario junto con el contexto legal para generar una respuesta estructurada.
-6. **Frontend**: Renderiza la respuesta y permite la visualización de artículos en un visor lateral.
+1. **Usuario**: Envía consulta y/o seguimientos vía Chat UI.
+2. **Chat API**: Recibe solicitud, analiza intención (Intent Detection) y maneja memoria de conversación.
+3. **Retrieval (Normalized)**: Busca en archivos JSON normalizados cargados en memoria (motor híbrido léxico+reglas). No usa PostgreSQL todavía.
+4. **Context Builder**: Filtra por relevancia y realiza un ranking de autoridad legal (Phase 7B).
+5. **Generación LLM**: Procesa el contexto filtrado usando OpenAI (gpt-4o) para generar respuestas estructuradas. Utiliza `MockEngine` solo como fallback en caso de error.
+6. **Frontend**: Renderiza la respuesta con citas estructuradas y permite visor lateral de artículos.
 
 ---
 
@@ -27,41 +27,42 @@ MyFiscal es un motor de análisis jurídico-fiscal diseñado para proporcionar o
 - `/api/articles/[id]/route.ts`: Servicio de entrega de contenido legal completo.
 
 ### Capa de Servicios (Core Logic)
-- `legal-search.ts`: Motor de scoring y ranking basado en tokens y relevancia.
-- `hybrid-retrieval.ts`: Coordinador de búsqueda híbrida.
-- `context-builder.ts`: Generador de contexto para el motor de respuestas.
-- `legal-synonyms.ts`: Diccionario de términos equivalentes para expansión de consultas.
-- `mock-engine.ts`: Generador de respuestas estructuradas (Actual: Reglas-fijas).
+- `normalized-retrieval.ts`: Motor de búsqueda cargando artículos normalizados (JSON) en memoria.
+- `legal-search.ts` / `hybrid-retrieval.ts`: Herramientas heredadas de búsqueda por tokens/temas.
+- `context-builder.ts`: Generador de contexto para el LLM.
+- `query-analyzer.ts` / `conversation-context.ts`: Detección de intención y memoria de sesiones.
+- `legal-authority-ranker.ts`: Clasificador para priorizar leyes (Primary vs Supporting).
+- `mock-engine.ts`: Generador de respuestas estructuradas Offline/Fallback.
 
 ### Capa de Datos (Dataset)
-- `lib/laws/`: Contiene los artículos indexados de CFF, LISR y LIVA.
+- `data/legal/normalized/`: Contiene artículos indexados (CFF, LISR, LIVA) en JSON. (Fuente de verdad actual).
+- `lib/laws/`: Datos estáticos de TypeScript (En proceso de deprecación).
 
 ---
 
-## 3. ESTADO ACTUAL (NIVEL MVP AVANZADO)
+## 3. ESTADO ACTUAL (NIVEL MVP AVANZADO / PRERELEASE)
 
 | Módulo | Estatus | Observaciones |
 | :--- | :--- | :--- |
-| **Dataset Legal** | Parcial | Contiene artículos clave, no las leyes completas. |
-| **Search Engine** | Operativo | Ranking funcional por tokens y temas. |
-| **RAG Híbrido** | Operativo | Simulado localmente con expansión de sinónimos. |
-| **UI/UX** | Avanzado | Interfaz fluida, modo oscuro, visor lateral. |
-| **Memoria** | Ausente | Cada mensaje es independiente. |
-| **Motor AI** | Mock | Respuestas predefinidas basadas en coincidencia de temas. |
+| **Dataset Legal** | Parcial | Ingestión vía `manifest.json` hacia archivos JSON funcionales. BD PostgreSQL preparada pero desconectada. |
+| **Search Engine** | Operativo | Búsqueda léxica determinística en JSON de memoria. (Vector Search pendiente). |
+| **RAG Avanzado** | Operativo | Filtros de relevancia (Intents) y ranking de autoridad integrados. |
+| **UI/UX** | Avanzado | Interfaz pulida, controles de chat, modo claro/oscuro integrados. |
+| **Memoria** | Operativo | Historial manejado en la API para detección de preguntas de seguimiento. |
+| **Motor AI** | Integrado | OpenAI GPT-4o activo en `/api/chat/route.ts` con tipado estricto. (MockEngine es fallback). |
 
 ---
 
 ## 4. ROADMAP TÉCNICO
 
-### Fase 1: Cierre de MVP (Reparaciones)
-- [ ] **Conectar Botones Muertos**: Implementar handlers para "Descargar reporte", "Copiar", y "Compartir".
-- [ ] **Persistencia de Sesión**: Asegurar que el historial en `Storage` sea consistente con la UI.
-- [ ] **Feedback Loop**: Agregar botones de "Pulgar arriba/abajo" para recolectar datos de precisión.
+### Fase 1: Transición a Base de Datos (Prioridad Crítica)
+- [ ] **PostgreSQL en Producción**: Conectar el `context-builder` a `lib/db.ts` eliminando el uso de `data/legal/normalized/` cargado en RAM.
+- [ ] **Deprecación Estática**: Borrar/remover referencias finales a `lib/laws/*.ts`.
+- [ ] **Rate Limiting**: Implementar control de peticiones para proteger el uso de tokens con OpenAI.
 
-### Fase 2: Inteligencia Real (Evolución)
-- [ ] **Memoria de Conversación**: Implementar `contextWindow` en la API para recordar mensajes previos.
-- [ ] **Embeddings & Vector Search**: Migrar de búsqueda por tokens a búsqueda vectorial (Pinecone/Supabase Vector).
-- [ ] **LLM Integration**: Reemplazar `MockEngine` por OpenAI (GPT-4o) o Claude 3.5 Sonnet.
+### Fase 2: Búsqueda Vectorial (Real Inteligencia)
+- [ ] **Embeddings**: Inyectar cronjobs o endpoints para procesar vectores con text-embedding-3-small.
+- [ ] **pgvector Search**: Implementar cosine similarity `<=>` a la consulta PostgreSQL en RAG.
 
 ### Fase 3: Dataset Completo
 - [ ] **Ingesta Masiva**: Indexar el 100% de CFF, LISR y LIVA.
