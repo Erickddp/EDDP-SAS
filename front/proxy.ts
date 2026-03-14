@@ -5,7 +5,7 @@ import { decrypt } from "@/lib/session";
 const protectedRoutes = ["/chat"];
 const authEntryRoutes = ["/login", "/register"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   if (path === "/demo") {

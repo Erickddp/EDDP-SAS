@@ -14,12 +14,36 @@ import { filterArticlesByRelevance } from "@/lib/article-relevance";
 import { extractArticleFragments } from "@/lib/article-fragment";
 import { rankLegalAuthority, RankedArticle } from "@/lib/legal-authority-ranker";
 
+import { getSession } from "@/lib/session";
+import { checkUsageLimit, incrementUsage } from "@/lib/usage-enforcer";
+import { logUsage } from "@/lib/observability";
+
 export async function POST(req: Request) {
+    const startTime = Date.now();
     try {
+        const session = await getSession();
         const body: ChatRequest = await req.json();
 
         if (!body.message || !body.conversationId) {
             return NextResponse.json({ error: "Mensaje u ID de conversación faltante" }, { status: 400 });
+        }
+
+        // ──────────────────────────────────────────────────────────────────
+        // SaaS: Usage Limit Check
+        // ──────────────────────────────────────────────────────────────────
+        if (session) {
+            const isGuest = session.role === "guest";
+            const { allowed, remaining, total } = await checkUsageLimit(session.id, session.plan, isGuest);
+            
+            if (!allowed) {
+                return NextResponse.json({ 
+                    error: "Límite de consultas alcanzado", 
+                    details: `Has usado todas tus consultas para tu plan ${session.plan}. Por favor, actualiza tu plan para continuar.`,
+                    limitReached: true,
+                    total,
+                    remaining
+                }, { status: 402 });
+            }
         }
 
         // ──────────────────────────────────────────────────────────────────
@@ -365,9 +389,44 @@ export async function POST(req: Request) {
 
         const finalResponse = { ...chatResponse, _debug: debugMeta };
         console.log(`│ API Response: ${chatResponse.answer.primaryBasis?.ref || "no primary"} | primaryBasisLaw: ${debugMeta.primaryBasisLaw}`);
+        
+        // ──────────────────────────────────────────────────────────────────
+        // SaaS: Usage Tracking & Observability
+        // ──────────────────────────────────────────────────────────────────
+        if (session) {
+            await incrementUsage(session.id);
+            await logUsage({
+                userId: session.id,
+                conversationId: body.conversationId,
+                promptTokens: 0, // In future, extract actual tokens from LLM response
+                completionTokens: 0,
+                model: OPENAI_MODEL || "mock",
+                durationMs: Date.now() - startTime,
+                status: "success",
+                ipAddress: req.headers.get("x-forwarded-for") || "local"
+            });
+        }
+
         return NextResponse.json(finalResponse);
     } catch (error: any) {
         console.error("Chat API Error:", error);
+        
+        // Log Error for Observability
+        const session = await getSession();
+        if (session) {
+            await logUsage({
+                userId: session.id,
+                conversationId: "error",
+                promptTokens: 0,
+                completionTokens: 0,
+                model: OPENAI_MODEL || "mock",
+                durationMs: Date.now() - startTime,
+                status: "error",
+                errorMessage: error.message,
+                ipAddress: req.headers.get("x-forwarded-for") || "local"
+            });
+        }
+
         return NextResponse.json({ error: "Error procesando la consulta fiscal", details: error instanceof Error ? error.message : "Desconocido" }, { status: 500 });
     }
 }

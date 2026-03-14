@@ -8,7 +8,7 @@ import { Badge } from "../ui/badge";
 import { CheckCircle2 } from "lucide-react";
 
 import { guestLogin } from "@/lib/auth";
-import type { UserSession } from "@/lib/user-storage";
+import type { UserSession } from "@/lib/session";
 
 interface HeroProps {
     user?: UserSession | null;

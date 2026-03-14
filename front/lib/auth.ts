@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { redirect } from "next/navigation";
 import { createSession, deleteSession } from "./session";
@@ -37,6 +37,8 @@ export async function login(_prevState: { error?: string } | undefined, formData
         role: user.role,
         avatarUrl: resolvedAvatar,
         googleAvatarUrl: user.googleAvatarUrl ?? null,
+        plan: user.plan || "gratis",
+        subscriptionStatus: user.subscriptionStatus || "active",
     });
 
     redirect("/chat");
@@ -73,6 +75,8 @@ export async function register(_prevState: { error?: string } | undefined, formD
         role: user.role,
         avatarUrl: user.avatarUrl,
         googleAvatarUrl: user.googleAvatarUrl ?? null,
+        plan: user.plan,
+        subscriptionStatus: user.subscriptionStatus,
     });
 
     redirect("/chat");
@@ -89,6 +93,8 @@ export async function guestLogin() {
         role: "guest",
         avatarUrl,
         googleAvatarUrl: null,
+        plan: "gratis",
+        subscriptionStatus: "active",
     });
 
     redirect("/chat");

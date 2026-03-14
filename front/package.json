@@ -24,7 +24,8 @@
     "test:answers": "tsx --env-file=.env scripts/test-answers.ts",
     "test:citations": "tsx --env-file=.env scripts/test-citations.ts",
     "test:reasoning": "tsx --env-file=.env scripts/test-reasoning.ts",
-    "test:authority-ranking": "tsx --env-file=.env scripts/test-authority-ranking.ts"
+    "test:authority-ranking": "tsx --env-file=.env scripts/test-authority-ranking.ts",
+    "migrate:saas": "npx tsx scripts/migrate-saas.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

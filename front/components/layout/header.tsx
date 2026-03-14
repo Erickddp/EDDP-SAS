@@ -8,7 +8,7 @@ import { Button } from "../ui/button";
 import { MobileMenu } from "./mobile-menu";
 import { cn } from "@/lib/utils";
 import { logout } from "@/lib/auth";
-import type { UserSession } from "@/lib/user-storage";
+import type { UserSession } from "@/lib/session";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 interface HeaderProps {
