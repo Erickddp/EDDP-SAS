@@ -1,6 +1,7 @@
 import { Pool, QueryResult, QueryResultRow } from 'pg';
+import { CONFIG } from './env-config';
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = CONFIG.DATABASE_URL;
 
 if (!connectionString) {
   console.warn('⚠️ DATABASE_URL not found in environment variables. Database features will be unavailable.');

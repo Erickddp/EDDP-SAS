@@ -64,6 +64,13 @@ export function MobileMenu({ isOpen, onClose, enterHref = "/login" }: MobileMenu
                             >
                                 Chat
                             </Link>
+                            <Link
+                                href="/account"
+                                className="text-lg font-medium text-text-sec transition-colors hover:text-cyan-main"
+                                onClick={onClose}
+                            >
+                                Mi Cuenta
+                            </Link>
                             <div className="h-px w-full bg-border-glow" />
                             <Link href={enterHref} onClick={onClose}>
                                 <Button variant="primary" className="w-full">

@@ -1,8 +1,5 @@
-import * as dotenv from 'dotenv';
-import path from 'path';
+import "./load-env";
 import { Pool } from 'pg';
-
-dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -10,6 +7,10 @@ const pool = new Pool({
 });
 
 async function run() {
+  if (!process.env.DATABASE_URL) {
+    console.error("❌ DATABASE_URL missing");
+    return;
+  }
   const client = await pool.connect();
   try {
     console.log('Ensuring vector extension...');
@@ -22,8 +23,8 @@ async function run() {
     await client.query('CREATE INDEX IF NOT EXISTS idx_articles_embedding ON articles USING hnsw (embedding vector_cosine_ops);');
     
     console.log('✅ Migration successful.');
-  } catch (err) {
-    console.error('❌ Migration failed:', err);
+  } catch (err: any) {
+    console.error('❌ Migration failed:', err.message);
   } finally {
     client.release();
     await pool.end();

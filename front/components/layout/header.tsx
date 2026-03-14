@@ -68,6 +68,11 @@ export function Header({ user, forceGuestView = false, hasSession = false }: Hea
                                     <span className="text-sm text-text-sec">
                                         {user?.role === 'guest' ? 'Modo Invitado' : user?.name}
                                     </span>
+                                    <Link href="/account">
+                                        <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
+                                            Mi Cuenta
+                                        </Button>
+                                    </Link>
                                     <Link href="/chat">
                                         <Button variant="outline" size="sm">
                                             Ir al Chat

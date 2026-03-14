@@ -1,9 +1,10 @@
 import { SignJWT, jwtVerify, JWTPayload } from "jose";
 import { cookies } from "next/headers";
 import { PlanType } from "./saas-constants";
+import { CONFIG } from "./env-config";
 
-// In production, use a strong 32+ character secret from .env.local
-const secretKey = process.env.SESSION_SECRET || "super-secret-key-for-myfiscal-demo";
+// In production, use a strong 32+ character secret from CONFIG
+const secretKey = CONFIG.SESSION_SECRET;
 const encodedKey = new TextEncoder().encode(secretKey);
 
 export interface UserSession {

@@ -31,9 +31,17 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
     const u = rows[0];
     // Get subscription plan
     const { rows: subRows } = await query(
-        `SELECT plan_type, status FROM subscriptions WHERE user_id = $1 LIMIT 1`,
+        `SELECT plan_type, status, current_period_end, provider_subscription_id 
+         FROM subscriptions WHERE user_id = $1 LIMIT 1`,
         [u.id]
     );
+
+    const subscription = subRows[0];
+    const now = new Date();
+    const isPeriodValid = !subscription?.current_period_end || new Date(subscription.current_period_end) > now;
+    const isStatusValid = subscription?.status === 'active' || subscription?.status === 'trialing';
+    
+    const isPlanActive = isStatusValid && isPeriodValid;
 
     return {
         id: u.id,
@@ -42,8 +50,8 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
         role: u.role,
         avatarUrl: u.avatar_url,
         passwordHash: u.password_hash,
-        plan: subRows.length > 0 ? subRows[0].plan_type : "gratis",
-        subscriptionStatus: subRows.length > 0 ? subRows[0].status : "active",
+        plan: isPlanActive ? (subscription?.plan_type || "gratis") : "gratis",
+        subscriptionStatus: subscription?.status || "none",
         createdAt: u.created_at
     };
 }
@@ -95,6 +103,36 @@ export async function createUser(data: Omit<User, "id" | "createdAt" | "plan" | 
     } finally {
         client.release();
     }
+}
+
+export async function getSubscriptionByUserId(userId: string) {
+    const { rows } = await query(
+        `SELECT * FROM subscriptions WHERE user_id = $1 LIMIT 1`,
+        [userId]
+    );
+    return rows[0] || null;
+}
+
+export async function updateSubscription(userId: string, data: Partial<{
+    plan_type: string;
+    status: string;
+    current_period_start: Date;
+    current_period_end: Date;
+    provider: string;
+    provider_subscription_id: string;
+    stripe_subscription_id: string;
+    updated_at: Date;
+}>) {
+    const fields = Object.keys(data);
+    if (fields.length === 0) return;
+
+    const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(", ");
+    const values = fields.map(f => (data as any)[f]);
+
+    await query(
+        `UPDATE subscriptions SET ${setClause}, updated_at = NOW() WHERE user_id = $1`,
+        [userId, ...values]
+    );
 }
 
 export async function updateUserAvatar(userId: string, avatarUrl: string): Promise<void> {
