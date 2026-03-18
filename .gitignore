@@ -16,6 +16,14 @@ coverage/
 .env
 .env.*
 !.env.example
+*.json
+!package.json
+!tsconfig.json
+!package-lock.json
+!eslint.config.mjs
+!postcss.config.mjs
+!next.config.ts
+!next-env.d.ts
 
 # Logs
 *.log

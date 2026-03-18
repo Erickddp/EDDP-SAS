@@ -28,6 +28,7 @@ interface SessionAvatarResponse {
     lockedByGoogle: boolean;
     role?: "user" | "guest" | "admin";
     questionCount?: number;
+    professionalProfile?: string | null;
 }
 
 function getLatestExchange(messages: Message[]): Message[] {
@@ -62,10 +63,14 @@ export function ChatWindow({
         googleAvatarUrl: null,
         lockedByGoogle: false,
         role: "guest",
-        questionCount: 0
+        questionCount: 0,
+        professionalProfile: null
     });
     const [isAvatarLockedByGoogle, setIsAvatarLockedByGoogle] = useState(false);
     const [isAvatarSaving, setIsAvatarSaving] = useState(false);
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [tempProfessionalProfile, setTempProfessionalProfile] = useState("");
+    const [isProfileSaving, setIsProfileSaving] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Sync internal state with props
@@ -317,6 +322,26 @@ export function ChatWindow({
         }
     };
 
+    const handleUpdateProfile = async () => {
+        setIsProfileSaving(true);
+        try {
+            const response = await fetch("/api/user/profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ professionalProfile: tempProfessionalProfile })
+            });
+
+            if (!response.ok) throw new Error("Error al actualizar perfil");
+
+            setProfile(prev => ({ ...prev, professionalProfile: tempProfessionalProfile }));
+            setIsProfileModalOpen(false);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsProfileSaving(false);
+        }
+    };
+
     const effectiveUserAvatar = resolveEffectiveAvatar({
         avatarUrl: profile.avatarUrl,
         googleAvatarUrl: profile.googleAvatarUrl,
@@ -335,15 +360,27 @@ export function ChatWindow({
                         </div>
                         <div>
                              <h1 className="text-sm font-bold text-text-main">
-                                {profile.role === 'guest' ? `Invitado (${profile.questionCount}/2)` : 'Consulta Fiscal MyFiscal'}
+                                {profile.role === 'guest' ? `Invitado (${profile.questionCount}/2)` : (profile.professionalProfile ? `${profile.professionalProfile} MyFiscal` : 'Consulta Fiscal MyFiscal')}
                             </h1>
                             <p className="text-[10px] text-text-sec uppercase tracking-widest opacity-60">
-                                {profile.role === 'guest' ? 'Límite de Prueba' : 'Motor de análisis v1.0'}
+                                {profile.role === 'guest' ? 'Límite de Prueba' : (profile.professionalProfile ? 'Análisis Especializado' : 'Motor de análisis v1.0')}
                             </p>
                         </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
+                        {profile.role !== 'guest' && !profile.professionalProfile && (
+                             <button 
+                                onClick={() => {
+                                    setTempProfessionalProfile("");
+                                    setIsProfileModalOpen(true);
+                                }}
+                                className="flex items-center gap-2 rounded-lg bg-cyan-main/10 border border-cyan-main/30 px-3 py-1.5 text-[11px] font-medium text-cyan-glow hover:bg-cyan-main/20 transition-all"
+                             >
+                                <Info size={12} />
+                                Completar Perfil
+                             </button>
+                        )}
                         <ThemeToggle />
                         <div className="flex items-center gap-2 rounded-xl border border-border-glow bg-bg-sec/80 px-2 py-1">
                             <img
@@ -510,6 +547,60 @@ export function ChatWindow({
                 isOpen={isViewerOpen}
                 onClose={() => setIsViewerOpen(false)}
             />
+
+            <AnimatePresence>
+                {isProfileModalOpen && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-bg-main/80 backdrop-blur-md"
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="w-full max-w-md rounded-2xl border border-border-glow bg-bg-sec p-6 shadow-2xl"
+                        >
+                            <h3 className="mb-2 text-xl font-bold text-text-main">Personaliza tu experiencia</h3>
+                            <p className="mb-6 text-sm text-text-sec">
+                                Dinos cuál es tu perfil profesional. Esto ayudará a que MyFiscal adapte sus análisis deductivos a tu nivel de experiencia.
+                            </p>
+                            
+                            <div className="mb-6 flex flex-wrap gap-2">
+                                {["Contador", "Abogado", "Empresario", "Estudiante", "Otro"].map((p) => (
+                                    <button
+                                        key={p}
+                                        onClick={() => setTempProfessionalProfile(p)}
+                                        className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+                                            tempProfessionalProfile === p 
+                                            ? "bg-cyan-main text-bg-main" 
+                                            : "bg-bg-main border border-border-glow text-text-sec hover:border-cyan-main/50"
+                                        }`}
+                                    >
+                                        {p}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={() => setIsProfileModalOpen(false)}
+                                    className="flex-1 rounded-xl border border-border-glow bg-bg-main py-2.5 text-sm font-medium text-text-sec hover:bg-bg-sec transition-all"
+                                >
+                                    Omitir
+                                </button>
+                                <button 
+                                    onClick={handleUpdateProfile}
+                                    disabled={!tempProfessionalProfile || isProfileSaving}
+                                    className="flex-1 rounded-xl bg-cyan-main py-2.5 text-sm font-medium text-bg-main hover:bg-cyan-glow transition-all disabled:opacity-50"
+                                >
+                                    {isProfileSaving ? "Guardando..." : "Confirmar"}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

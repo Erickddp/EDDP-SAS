@@ -15,6 +15,7 @@ export interface UserSession {
   avatarUrl?: string;
   googleAvatarUrl?: string | null;
   plan: PlanType;
+  professionalProfile?: string | null;
   subscriptionStatus: "active" | "canceled" | "past_due" | "none";
   questionCount?: number; // Phase 8: Guest limit
 }

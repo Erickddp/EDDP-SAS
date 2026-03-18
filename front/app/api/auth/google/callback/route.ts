@@ -13,6 +13,9 @@ export async function GET(request: Request) {
 
     try {
         // 1. Exchange code for tokens
+        const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+        const redirectUri = `${origin}/api/auth/google/callback`;
+
         const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -20,7 +23,7 @@ export async function GET(request: Request) {
                 code,
                 client_id: process.env.GOOGLE_CLIENT_ID || "",
                 client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
-                redirect_uri: `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/google/callback`,
+                redirect_uri: redirectUri,
                 grant_type: "authorization_code",
             }),
         });
@@ -28,8 +31,9 @@ export async function GET(request: Request) {
         const tokens = await tokenResponse.json();
 
         if (!tokens.access_token) {
-            console.error("[GOOGLE AUTH] Failed to get access token", tokens);
-            throw new Error("Failed to get tokens");
+            console.error("[GOOGLE AUTH] Failed to get tokens:", tokens);
+            const errorMsg = tokens.error_description || tokens.error || "Token exchange failed";
+            return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(errorMsg)}`, request.url));
         }
 
         // 2. Get user info from Google
@@ -66,6 +70,7 @@ export async function GET(request: Request) {
             avatarUrl: user.avatarUrl,
             googleAvatarUrl: user.googleAvatarUrl ?? null,
             plan: user.plan || "gratis",
+            professionalProfile: user.professionalProfile || null,
             subscriptionStatus: user.subscriptionStatus || "active",
         });
 
@@ -75,7 +80,7 @@ export async function GET(request: Request) {
         return NextResponse.redirect(new URL("/chat", request.url));
 
     } catch (error: any) {
-        console.error("[GOOGLE AUTH] Error:", error.message);
-        return NextResponse.redirect(new URL("/login?error=Internal auth error", request.url));
+        console.error("[GOOGLE AUTH] Critical Error:", error.message);
+        return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, request.url));
     }
 }

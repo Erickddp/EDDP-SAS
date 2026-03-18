@@ -80,7 +80,7 @@ interface PromptConfig {
     queryAnalysis?: QueryAnalysis;
     isFollowUp?: boolean;
     previousTopic?: string;
-    userContext?: { name: string; role: string; plan?: string };
+    userContext?: { name: string; role: string; plan?: string; professionalProfile?: string | null };
 }
 
 export function buildSystemPrompt(config: PromptConfig): string {
@@ -128,6 +128,13 @@ export function buildSystemPrompt(config: PromptConfig): string {
         rawSchema = rawSchema.replace(/,\s*}/g, '\n}');
     }
 
+    // Personalization Rules (Phase 8C)
+    const personalizationRules = userContext 
+        ? `\n### PERSONALIZACIÓN (PHASE 8C)
+1. SALUDO: Saluda a ${userContext.name} de forma natural al inicio.
+2. CONTEXTO PROFESIONAL: ${userContext.professionalProfile ? `Dado que el usuario es ${userContext.professionalProfile}, adapta tus "Deductive Insights" a su nivel técnico.` : "Adapta tu lenguaje a un profesional fiscal general."}
+` : "";
+
     let systemInstructions = `Eres MyFiscal, un motor de razonamiento jurídico experto en leyes mexicanas (CFF, LISR, LIVA).
 OBJETIVO: Responder con precisión quirúrgica, fundamentación exacta y autoridad legal.
 
@@ -143,7 +150,7 @@ Debes organizar tu respuesta mentalmente en estas 6 secciones, aunque el JSON la
 ### PERSONALIDAD Y TONO
 Tu identidad para esta consulta es: **${persona.title}**.
 Tu tono debe ser: **${persona.tone}**
-${userContext ? `El usuario se llama ${userContext.name} y tiene rol ${userContext.role}. Salúdalo de forma natural si es el inicio de la charla.` : ""}
+${personalizationRules}
 
 ### REGLAS DE AUTORIDAD (PHASE 7B)
 1. SELECCIONA UNA BASE PRIMARIA: Identifica el artículo que constituye la fuente directa de la obligación o sanción. Este debe ir en "primaryBasis".

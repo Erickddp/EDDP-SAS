@@ -11,6 +11,7 @@ export interface User {
     googleAvatarUrl?: string | null;
     passwordHash: string;
     plan: PlanType;
+    professionalProfile?: string | null;
     subscriptionStatus: "active" | "canceled" | "past_due" | "none";
     createdAt: Date;
 }
@@ -51,6 +52,7 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
         avatarUrl: u.avatar_url,
         passwordHash: u.password_hash,
         plan: isPlanActive ? (subscription?.plan_type || "gratis") : "gratis",
+        professionalProfile: u.professional_profile || null,
         subscriptionStatus: subscription?.status || "none",
         createdAt: u.created_at
     };
@@ -62,10 +64,10 @@ export async function createUser(data: Omit<User, "id" | "createdAt" | "plan" | 
         await client.query("BEGIN");
         
         const { rows } = await client.query(
-            `INSERT INTO users (email, name, password_hash, avatar_url, role)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO users (email, name, password_hash, avatar_url, role, professional_profile)
+             VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING *`,
-            [data.email, data.name, data.passwordHash, data.avatarUrl, data.role]
+            [data.email, data.name, data.passwordHash, data.avatarUrl, data.role, data.professionalProfile || null]
         );
         
         const user = rows[0];
@@ -94,6 +96,7 @@ export async function createUser(data: Omit<User, "id" | "createdAt" | "plan" | 
             avatarUrl: user.avatar_url,
             passwordHash: user.password_hash,
             plan: "gratis",
+            professionalProfile: user.professional_profile || null,
             subscriptionStatus: "active",
             createdAt: user.created_at
         };
@@ -127,7 +130,7 @@ export async function updateSubscription(userId: string, data: Partial<{
     if (fields.length === 0) return;
 
     const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(", ");
-    const values = fields.map(f => (data as any)[f]);
+    const values = fields.map(f => (data as Record<string, unknown>)[f]);
 
     await query(
         `UPDATE subscriptions SET ${setClause}, updated_at = NOW() WHERE user_id = $1`,
@@ -139,5 +142,21 @@ export async function updateUserAvatar(userId: string, avatarUrl: string): Promi
     await query(
         `UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2`,
         [avatarUrl, userId]
+    );
+}
+
+export async function updateUserProfile(userId: string, data: { name?: string; professionalProfile?: string | null }): Promise<void> {
+    const fields = Object.keys(data);
+    if (fields.length === 0) return;
+
+    const setClause = fields.map((f, i) => {
+        const dbField = f === "professionalProfile" ? "professional_profile" : (f === "avatarUrl" ? "avatar_url" : f);
+        return `${dbField} = $${i + 2}`;
+    }).join(", ");
+    const values = fields.map(f => (data as Record<string, unknown>)[f]);
+
+    await query(
+        `UPDATE users SET ${setClause}, updated_at = NOW() WHERE id = $1`,
+        [userId, ...values]
     );
 }

@@ -14,6 +14,7 @@ import { buildRetrievalPlan } from "@/lib/retrieval-optimizer";
 import { filterArticlesByRelevance } from "@/lib/article-relevance";
 import { extractArticleFragments } from "@/lib/article-fragment";
 import { rankLegalAuthority, RankedArticle } from "@/lib/legal-authority-ranker";
+import { PlanType } from "@/lib/saas-constants";
 
 import { getSubscriptionByUserId } from "@/lib/user-storage";
 import { checkUsageLimit, incrementUsage } from "@/lib/usage-enforcer";
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
             plan = "gratis";
         }
 
-        const { allowed, remaining, total } = await checkUsageLimit(userId, plan as any, isGuest);
+        const { allowed, remaining, total } = await checkUsageLimit(userId, plan as PlanType, isGuest);
         
         if (!allowed) {
             return NextResponse.json({ 
@@ -85,7 +86,9 @@ export async function POST(req: Request) {
 
         const userContext = session ? {
             name: session.name,
-            role: session.role
+            role: session.role,
+            plan: session.plan,
+            professionalProfile: session.professionalProfile
         } : undefined;
 
         // ──────────────────────────────────────────────────────────────────
@@ -219,9 +222,15 @@ export async function POST(req: Request) {
         }
 
         // 2.8. Phase 7B: Legal Authority Ranking & Pruning
-        let ranking: any = { 
+        let ranking: { primary: RankedArticle | null; supporting: RankedArticle[]; rejected: RankedArticle[] } = { 
             primary: null, 
-            supporting: context.retrievedArticles.slice(0, tierConfig.articles).map(a => ({ article: a, reasons: ["Fallback"], role: "correlation" })), 
+            supporting: context.retrievedArticles.slice(0, tierConfig.articles).map(a => ({ 
+                article: a, 
+                reasons: ["Fallback"], 
+                role: "correlation",
+                score: 0.5,
+                isPrimary: false
+            })), 
             rejected: [] 
         };
 
@@ -329,9 +338,9 @@ export async function POST(req: Request) {
         let invalidCitationsRemoved = 0;
 
         if (Array.isArray(answer.citations)) {
-            answer.citations.forEach((cit: any) => {
+            (answer.citations as CitationEntry[]).forEach((cit) => {
                 if (cit.sourceId && retrievedArticleIds.has(cit.sourceId)) {
-                    validCitations.push(cit as CitationEntry);
+                    validCitations.push(cit);
                 } else {
                     invalidCitationsRemoved++;
                 }
@@ -353,12 +362,12 @@ export async function POST(req: Request) {
         // 4.2 Legacy Foundation 
         const modelFoundation = Array.isArray(answer.foundation) ? answer.foundation.filter(Boolean) : [];
         const fallbackFoundationRaw = mockResult?.answer.foundation || context.foundation || [];
-        const foundation = modelFoundation.length > 0 ? modelFoundation : fallbackFoundationRaw.map((item: any) => 
+        const foundation = modelFoundation.length > 0 ? modelFoundation : (fallbackFoundationRaw as (string | FoundationEntry)[]).map((item) => 
             typeof item === "string" ? { type: "primary" as const, ref: item } : item
         );
 
         // 5. Sugerencia de título
-        let titleSuggestion = mockResult?.titleSuggestion || "Consulta Fiscal";
+        const titleSuggestion = mockResult?.titleSuggestion || "Consulta Fiscal";
 
         // 6. Update conversation memory for next turn
         updateConversationContext(
@@ -418,9 +427,9 @@ export async function POST(req: Request) {
             primaryBasisRef: ranking.primary?.article.id,
             primaryBasisLaw: ranking.primary?.article.documentAbbreviation,
             primaryBasisWhy: ranking.primary?.reasons[0],
-            supportingBasisRefs: ranking.supporting?.map((s: any) => s.article.id),
-            supportingBasisLaws: ranking.supporting?.map((s: any) => s.article.documentAbbreviation),
-            rejectedBasisRefs: ranking.rejected?.map((s: any) => s.article.id),
+            supportingBasisRefs: ranking.supporting?.map((s) => s.article.id),
+            supportingBasisLaws: ranking.supporting?.map((s) => s.article.documentAbbreviation),
+            rejectedBasisRefs: ranking.rejected?.map((s) => s.article.id),
             mainPriorityApplied: true,
             subsectionPrecisionApplied: true
         };
@@ -460,7 +469,8 @@ export async function POST(req: Request) {
         });
 
         return NextResponse.json(finalResponse);
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const err = error as Error;
         // Observability logging
         await logUsage({
             userId,
@@ -470,18 +480,20 @@ export async function POST(req: Request) {
             model: OPENAI_MODEL || "unknown",
             durationMs: Date.now() - startTime,
             status: "error",
-            errorMessage: error.message,
+            errorMessage: err.message,
             ipAddress: req.headers.get("x-forwarded-for") || "local"
         });
 
         // Detect error type for user response
         let errorType = AppErrorType.INTERNAL;
-        if (error.code && (error.code.startsWith("42") || error.code === "ECONNREFUSED")) {
+        const appErr = err as { code?: string; status?: number; message: string };
+        
+        if (appErr.code && (appErr.code.startsWith("42") || appErr.code === "ECONNREFUSED")) {
             errorType = AppErrorType.DATABASE;
-        } else if (error.status && error.status >= 400 && error.message.includes("OpenAI")) {
+        } else if (appErr.status && appErr.status >= 400 && appErr.message.includes("OpenAI")) {
             errorType = AppErrorType.OPENAI;
         }
 
-        return handleApiError(error, errorType);
+        return handleApiError(err, errorType);
     }
 }
