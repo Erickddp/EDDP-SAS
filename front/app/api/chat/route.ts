@@ -9,13 +9,12 @@ import { parseLegalReference } from "@/lib/law-alias";
 import { analyzeQueryWithDebug } from "@/lib/query-analyzer";
 import { RETRIEVAL_CONFIG } from "@/lib/retrieval-config";
 import { getConversationContext, updateConversationContext, detectFollowUp } from "@/lib/conversation-context";
-import { getSession } from "@/lib/session";
+import { getSession, updateSessionData } from "@/lib/session";
 import { buildRetrievalPlan } from "@/lib/retrieval-optimizer";
 import { filterArticlesByRelevance } from "@/lib/article-relevance";
 import { extractArticleFragments } from "@/lib/article-fragment";
 import { rankLegalAuthority, RankedArticle } from "@/lib/legal-authority-ranker";
 
-import { getSession } from "@/lib/session";
 import { getSubscriptionByUserId } from "@/lib/user-storage";
 import { checkUsageLimit, incrementUsage } from "@/lib/usage-enforcer";
 import { logUsage } from "@/lib/observability";
@@ -75,8 +74,15 @@ export async function POST(req: Request) {
             }, { status: 402 });
         }
 
-        // 0. Get User Session (Phase 7C)
-        const session = await getSession();
+        // 0. Get User Session (Phase 8: Guard - Combined)
+        if (session?.role === 'guest' && (session.questionCount || 0) >= 2) {
+            return NextResponse.json({ 
+                error: "Límite de prueba alcanzado", 
+                code: "GUEST_LIMIT_REACHED",
+                message: "Has alcanzado el límite de 2 consultas como invitado. Regístrate o usa Google para continuar." 
+            }, { status: 403 });
+        }
+
         const userContext = session ? {
             name: session.name,
             role: session.role
@@ -364,6 +370,15 @@ export async function POST(req: Request) {
             context.retrievedArticles[0]?.documentAbbreviation || "general",
             body.message
         );
+
+        // 6.5. Increment Guest Counter (Phase 8)
+        if (session?.role === 'guest') {
+            const currentCount = session.questionCount || 0;
+            await updateSessionData({ 
+                questionCount: currentCount + 1 
+            });
+            console.log(`│ Guest Limit: ${currentCount + 1}/2 questions used`);
+        }
 
         // ─── Build debug metadata ────────────────────────────────────────
         const debugMeta: AdaptiveDebugMeta = {

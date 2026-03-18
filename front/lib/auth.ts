@@ -130,6 +130,24 @@ export async function guestLogin() {
         googleAvatarUrl: null,
         plan: "gratis",
         subscriptionStatus: "active",
+        questionCount: 0, // Phase 8: Start counter
+    });
+}
+
+export async function googleLogin() {
+    // Phase 8: Google Auth Simulation
+    // In a real app, this would receive the ID token from Google and verify it
+    const mockGoogleId = "google-" + Math.random().toString(36).substring(2, 11);
+    
+    await createSession({
+        id: mockGoogleId,
+        email: `user_${mockGoogleId}@gmail.com`,
+        name: "Usuario Google",
+        role: "user",
+        avatarUrl: "/avatars/avatar-ocean.svg",
+        googleAvatarUrl: "/avatars/avatar-ocean.svg",
+        plan: "gratis",
+        subscriptionStatus: "active",
     });
 
     redirect("/chat");

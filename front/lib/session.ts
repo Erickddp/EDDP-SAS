@@ -16,6 +16,7 @@ export interface UserSession {
   googleAvatarUrl?: string | null;
   plan: PlanType;
   subscriptionStatus: "active" | "canceled" | "past_due" | "none";
+  questionCount?: number; // Phase 8: Guest limit
 }
 
 export async function encrypt(payload: UserSession) {
@@ -80,4 +81,12 @@ export async function getSession() {
     const sessionCookie = cookieStore.get("session")?.value;
     if (!sessionCookie) return null;
     return await decrypt(sessionCookie);
+}
+
+export async function updateSessionData(data: Partial<UserSession>) {
+    const current = await getSession();
+    if (!current) return;
+    
+    const updated = { ...current, ...data };
+    await createSession(updated);
 }

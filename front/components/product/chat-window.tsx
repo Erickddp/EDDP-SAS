@@ -170,7 +170,33 @@ export function ChatWindow({
                 } as ChatRequest)
             });
 
-            if (!response.ok) throw new Error("Error en la respuesta del asistente");
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                if (errorData.code === "GUEST_LIMIT_REACHED") {
+                    const limitMessage: Message = {
+                        id: (Date.now() + 2).toString(),
+                        conversationId: targetConvId,
+                        role: "assistant",
+                        content: {
+                            summary: "¡Has descubierto el potencial de MyFiscal!",
+                            explanation: "Como invitado, has alcanzado tu límite de 2 consultas gratuitas. Para seguir obteniendo análisis legales de alta precisión, te invitamos a unirte a nuestra comunidad.",
+                            deductiveInsight: "Registrarte con Google es instantáneo y te permitirá mantener tu historial de consultas y acceder a funciones avanzadas de análisis jurídico.",
+                            proactiveQuestion: "¿Te gustaría continuar ahora mismo con tu cuenta de Google?",
+                            foundation: [],
+                            scenarios: ["Acceso ilimitado a consultas básicas", "Historial sincronizado en la nube", "Prioridad en análisis de leyes federales"],
+                            consequences: [],
+                            certainty: "Alta",
+                            disclaimer: "Regístrate para continuar."
+                        },
+                        createdAt: Date.now()
+                    };
+                    setMessages(prev => [...prev, limitMessage]);
+                    Storage.saveMessage(limitMessage);
+                    setIsTyping(false);
+                    return;
+                }
+                throw new Error("Error en la respuesta del asistente");
+            }
 
             const data: ChatResponse = await response.json();
 
