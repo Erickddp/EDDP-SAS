@@ -66,7 +66,9 @@ export function Header({ user, forceGuestView = false, hasSession = false }: Hea
                             {showAuthenticatedActions ? (
                                 <div className="flex items-center gap-4 ml-4">
                                     <span className="text-sm text-text-sec">
-                                        {user?.role === 'guest' ? 'Modo Invitado' : user?.name}
+                                        {user?.role === 'guest' 
+                                            ? `Invitado (${user.questionCount || 0}/2)` 
+                                            : user?.name}
                                     </span>
                                     <Link href="/account">
                                         <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
