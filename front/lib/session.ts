@@ -1,10 +1,22 @@
 import { SignJWT, jwtVerify, JWTPayload } from "jose";
 import { cookies } from "next/headers";
-import type { UserSession } from "./user-storage";
+import { PlanType } from "./saas-constants";
+import { CONFIG } from "./env-config";
 
-// In production, use a strong 32+ character secret from .env.local
-const secretKey = process.env.SESSION_SECRET || "super-secret-key-for-myfiscal-demo";
+// In production, use a strong 32+ character secret from CONFIG
+const secretKey = CONFIG.SESSION_SECRET;
 const encodedKey = new TextEncoder().encode(secretKey);
+
+export interface UserSession {
+  id: string;
+  email: string;
+  name: string;
+  role: "user" | "guest" | "admin";
+  avatarUrl?: string;
+  googleAvatarUrl?: string | null;
+  plan: PlanType;
+  subscriptionStatus: "active" | "canceled" | "past_due" | "none";
+}
 
 export async function encrypt(payload: UserSession) {
   return new SignJWT(payload as unknown as JWTPayload)

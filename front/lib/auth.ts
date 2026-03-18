@@ -1,43 +1,73 @@
-﻿"use server";
+"use server";
 
 import { redirect } from "next/navigation";
 import { createSession, deleteSession } from "./session";
 import { getUserByEmail, createUser, updateUserAvatar } from "./user-storage";
 import { getRandomAvatar, resolveEffectiveAvatar } from "./avatar-options";
+import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
+
+/**
+ * Hash a password using scrypt
+ */
+function hashPassword(password: string): string {
+    const salt = randomBytes(16).toString("hex");
+    const hash = scryptSync(password, salt, 64).toString("hex");
+    return `${salt}:${hash}`;
+}
+
+/**
+ * Verify a password against a hash
+ */
+function verifyPassword(password: string, storedHash: string): boolean {
+    const [salt, hash] = storedHash.split(":");
+    if (!salt || !hash) return false;
+    const key = scryptSync(password, salt, 64);
+    const hashBuffer = Buffer.from(hash, "hex");
+    return timingSafeEqual(key, hashBuffer);
+}
 
 export async function login(_prevState: { error?: string } | undefined, formData: FormData) {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
     if (!email || !password) {
-        return { error: "Email y contrase\u00f1a son requeridos" };
+        return { error: "Email y contraseña son requeridos" };
     }
 
-    const user = await getUserByEmail(email);
+    try {
+        const user = await getUserByEmail(email);
 
-    // In a real app we would verify the password hash using bcrypt
-    if (!user || user.passwordHash !== password) {
-        return { error: "Credenciales inv\u00e1lidas" };
+        if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
+            console.warn(`[AUTH] Failed login attempt for: ${email}`);
+            return { error: "Credenciales inválidas" };
+        }
+
+        const resolvedAvatar = resolveEffectiveAvatar({
+            avatarUrl: user.avatarUrl,
+            googleAvatarUrl: user.googleAvatarUrl,
+            seed: user.id,
+        });
+
+        if (!user.avatarUrl && !user.googleAvatarUrl) {
+            await updateUserAvatar(user.id, resolvedAvatar);
+        }
+
+        await createSession({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            avatarUrl: resolvedAvatar,
+            googleAvatarUrl: user.googleAvatarUrl ?? null,
+            plan: user.plan || "gratis",
+            subscriptionStatus: user.subscriptionStatus || "active",
+        });
+
+        console.log(`[AUTH] User login successful: ${user.id} (${user.email})`);
+    } catch (error: any) {
+        console.error(`[AUTH] Login error:`, error.message);
+        return { error: "Error interno durante el inicio de sesión" };
     }
-
-    const resolvedAvatar = resolveEffectiveAvatar({
-        avatarUrl: user.avatarUrl,
-        googleAvatarUrl: user.googleAvatarUrl,
-        seed: user.id,
-    });
-
-    if (!user.avatarUrl && !user.googleAvatarUrl) {
-        await updateUserAvatar(user.id, resolvedAvatar);
-    }
-
-    await createSession({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        avatarUrl: resolvedAvatar,
-        googleAvatarUrl: user.googleAvatarUrl ?? null,
-    });
 
     redirect("/chat");
 }
@@ -51,29 +81,38 @@ export async function register(_prevState: { error?: string } | undefined, formD
         return { error: "Todos los campos son requeridos" };
     }
 
-    const existingUser = await getUserByEmail(email);
-    if (existingUser) {
-        return { error: "El email ya est\u00e1 registrado" };
+    try {
+        const existingUser = await getUserByEmail(email);
+        if (existingUser) {
+            return { error: "El email ya está registrado" };
+        }
+
+        // Securely hash the password
+        const user = await createUser({
+            name,
+            email,
+            avatarUrl: getRandomAvatar(email),
+            googleAvatarUrl: null,
+            passwordHash: hashPassword(password),
+            role: "user",
+        });
+
+        await createSession({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            avatarUrl: user.avatarUrl,
+            googleAvatarUrl: user.googleAvatarUrl ?? null,
+            plan: user.plan,
+            subscriptionStatus: user.subscriptionStatus,
+        });
+
+        console.log(`[AUTH] New user registered: ${user.id} (${user.email})`);
+    } catch (error: any) {
+        console.error(`[AUTH] Registration error:`, error.message);
+        return { error: "Error interno durante el registro" };
     }
-
-    // In a real app we would hash the password
-    const user = await createUser({
-        name,
-        email,
-        avatarUrl: getRandomAvatar(email),
-        googleAvatarUrl: null,
-        passwordHash: password,
-        role: "user",
-    });
-
-    await createSession({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        avatarUrl: user.avatarUrl,
-        googleAvatarUrl: user.googleAvatarUrl ?? null,
-    });
 
     redirect("/chat");
 }
@@ -89,6 +128,8 @@ export async function guestLogin() {
         role: "guest",
         avatarUrl,
         googleAvatarUrl: null,
+        plan: "gratis",
+        subscriptionStatus: "active",
     });
 
     redirect("/chat");

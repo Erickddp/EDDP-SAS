@@ -7,5 +7,12 @@
     "build": "npm run build --prefix front",
     "start": "npm run start --prefix front",
     "lint": "npm run lint --prefix front"
+  },
+  "dependencies": {
+    "jose": "^6.2.1"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4",
+    "@tailwindcss/postcss": "^4"
   }
 }

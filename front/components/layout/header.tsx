@@ -8,7 +8,7 @@ import { Button } from "../ui/button";
 import { MobileMenu } from "./mobile-menu";
 import { cn } from "@/lib/utils";
 import { logout } from "@/lib/auth";
-import type { UserSession } from "@/lib/user-storage";
+import type { UserSession } from "@/lib/session";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 interface HeaderProps {
@@ -68,6 +68,11 @@ export function Header({ user, forceGuestView = false, hasSession = false }: Hea
                                     <span className="text-sm text-text-sec">
                                         {user?.role === 'guest' ? 'Modo Invitado' : user?.name}
                                     </span>
+                                    <Link href="/account">
+                                        <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
+                                            Mi Cuenta
+                                        </Button>
+                                    </Link>
                                     <Link href="/chat">
                                         <Button variant="outline" size="sm">
                                             Ir al Chat

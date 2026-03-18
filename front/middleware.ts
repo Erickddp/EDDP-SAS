@@ -1,34 +1,42 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { decrypt } from "@/lib/session";
-
-const protectedRoutes = ["/chat"];
-const authEntryRoutes = ["/login", "/register"];
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { decrypt } from '@/lib/session';
 
 export async function middleware(request: NextRequest) {
-  const path = request.nextUrl.pathname;
+  const { pathname } = request.nextUrl;
 
-  if (path === "/demo") {
-    return NextResponse.redirect(new URL("/chat", request.nextUrl));
+  // Protect /api/chat
+  if (pathname.startsWith('/api/chat')) {
+    const sessionCookie = request.cookies.get('session')?.value;
+    const session = await decrypt(sessionCookie);
+
+    if (!session) {
+      return NextResponse.json(
+        { error: 'No autorizado. Por favor inicia sesión.' },
+        { status: 401 }
+      );
+    }
+    
+    // Check for guest limitations if needed (handled in route logic)
   }
 
-  const isProtectedRoute = protectedRoutes.some((route) => path.startsWith(route));
-  const isAuthEntryRoute = authEntryRoutes.includes(path);
-
-  const cookie = request.cookies.get("session")?.value;
-  const session = await decrypt(cookie);
-
-  if (isProtectedRoute && !session) {
-    return NextResponse.redirect(new URL("/login", request.nextUrl));
-  }
-
-  if (isAuthEntryRoute && session) {
-    return NextResponse.redirect(new URL("/chat", request.nextUrl));
+  // Basic redirection for /chat and /account if not logged in
+  if (pathname === '/chat' || pathname === '/account') {
+      const sessionCookie = request.cookies.get('session')?.value;
+      const session = await decrypt(sessionCookie);
+      
+      if (!session) {
+          return NextResponse.redirect(new URL('/login', request.url));
+      }
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    '/api/chat/:path*',
+    '/chat/:path*',
+    '/account/:path*',
+  ],
 };

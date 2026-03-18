@@ -15,12 +15,64 @@ import { filterArticlesByRelevance } from "@/lib/article-relevance";
 import { extractArticleFragments } from "@/lib/article-fragment";
 import { rankLegalAuthority, RankedArticle } from "@/lib/legal-authority-ranker";
 
+import { getSession } from "@/lib/session";
+import { getSubscriptionByUserId } from "@/lib/user-storage";
+import { checkUsageLimit, incrementUsage } from "@/lib/usage-enforcer";
+import { logUsage } from "@/lib/observability";
+import { handleApiError, AppErrorType, validatedMethod } from "@/lib/error-handler";
+
 export async function POST(req: Request) {
+    const methodError = validatedMethod(req, ["POST"]);
+    if (methodError) return methodError;
+
+    const startTime = Date.now();
+    let userId = "unknown";
+    let plan = "gratis";
+    let isGuest = true;
+
     try {
-        const body: ChatRequest = await req.json();
+        const session = await getSession();
+        let body: ChatRequest;
+        
+        try {
+            body = await req.json();
+        } catch (e) {
+            return handleApiError(new Error("Payload JSON inválido"), AppErrorType.VALIDATION);
+        }
 
         if (!body.message || !body.conversationId) {
-            return NextResponse.json({ error: "Mensaje u ID de conversación faltante" }, { status: 400 });
+            return handleApiError(new Error("Mensaje u ID de conversación faltante"), AppErrorType.VALIDATION);
+        }
+
+        // ──────────────────────────────────────────────────────────────────
+        // SaaS: Usage Limit Check (Real-time from DB)
+        // ──────────────────────────────────────────────────────────────────
+        userId = session?.id || "anonymous-guest-" + (req.headers.get("x-forwarded-for") || "local");
+        isGuest = !session || session.role === "guest";
+        
+        if (!isGuest && session?.id) {
+            const subscription = await getSubscriptionByUserId(session.id);
+            const now = new Date();
+            const isPeriodValid = !subscription?.current_period_end || new Date(subscription.current_period_end) > now;
+            const isStatusValid = subscription?.status === 'active' || subscription?.status === 'trialing';
+            
+            plan = (isStatusValid && isPeriodValid) ? (subscription?.plan_type || "gratis") : "gratis";
+        } else {
+            plan = "gratis";
+        }
+
+        const { allowed, remaining, total } = await checkUsageLimit(userId, plan as any, isGuest);
+        
+        if (!allowed) {
+            return NextResponse.json({ 
+                error: "Límite de consultas alcanzado", 
+                details: isGuest 
+                    ? "Has agotado tus consultas como invitado. Regístrate gratis para obtener más." 
+                    : `Has usado todas tus consultas para tu plan ${plan}. Por favor, actualiza tu plan para continuar.`,
+                limitReached: true,
+                total,
+                remaining
+            }, { status: 402 });
         }
 
         // 0. Get User Session (Phase 7C)
@@ -373,9 +425,48 @@ export async function POST(req: Request) {
 
         const finalResponse = { ...chatResponse, _debug: debugMeta };
         console.log(`│ API Response: ${chatResponse.answer.primaryBasis?.ref || "no primary"} | primaryBasisLaw: ${debugMeta.primaryBasisLaw}`);
+        
+        // ──────────────────────────────────────────────────────────────────
+        // SaaS: Usage Tracking & Observability
+        // ──────────────────────────────────────────────────────────────────
+        if (!isGuest) {
+            await incrementUsage(userId);
+        }
+        
+        await logUsage({
+            userId: userId,
+            conversationId: body.conversationId,
+            promptTokens: 0, // In future, extract actual tokens from LLM response
+            completionTokens: 0,
+            model: OPENAI_MODEL || "mock",
+            durationMs: Date.now() - startTime,
+            status: "success",
+            ipAddress: req.headers.get("x-forwarded-for") || "local"
+        });
+
         return NextResponse.json(finalResponse);
     } catch (error: any) {
-        console.error("Chat API Error:", error);
-        return NextResponse.json({ error: "Error procesando la consulta fiscal", details: error instanceof Error ? error.message : "Desconocido" }, { status: 500 });
+        // Observability logging
+        await logUsage({
+            userId,
+            conversationId: "error",
+            promptTokens: 0,
+            completionTokens: 0,
+            model: OPENAI_MODEL || "unknown",
+            durationMs: Date.now() - startTime,
+            status: "error",
+            errorMessage: error.message,
+            ipAddress: req.headers.get("x-forwarded-for") || "local"
+        });
+
+        // Detect error type for user response
+        let errorType = AppErrorType.INTERNAL;
+        if (error.code && (error.code.startsWith("42") || error.code === "ECONNREFUSED")) {
+            errorType = AppErrorType.DATABASE;
+        } else if (error.status && error.status >= 400 && error.message.includes("OpenAI")) {
+            errorType = AppErrorType.OPENAI;
+        }
+
+        return handleApiError(error, errorType);
     }
 }
