@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { login, googleLogin } from "@/lib/auth";
+import { login, googleLogin, guestLogin } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/layout/container";
 import { Header } from "@/components/layout/header";
@@ -83,6 +83,15 @@ export default function LoginPage() {
                   <Button type="submit" className="w-full py-6 rounded-xl bg-bg-main border border-cyan-main/30 text-cyan-main hover:bg-cyan-main/10 hover:border-cyan-main/50 shadow-lg shadow-cyan-main/5 transition-all font-bold">
                     Iniciar Sesión
                   </Button>
+                </form>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-border-glow/30">
+                <form action={guestLogin}>
+                  <button type="submit" className="w-full text-sm text-text-sec hover:text-cyan-main transition-all font-medium flex items-center justify-center gap-2 group">
+                    <span>O prueba la demo como</span>
+                    <span className="text-cyan-main underline decoration-cyan-main/30 group-hover:decoration-cyan-main">invitado (2 preguntas)</span>
+                  </button>
                 </form>
               </div>
 

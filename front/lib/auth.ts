@@ -132,11 +132,33 @@ export async function guestLogin() {
         subscriptionStatus: "active",
         questionCount: 0, // Phase 8: Start counter
     });
+
+    redirect("/chat");
 }
 
 export async function googleLogin() {
-    // Phase 8: Google Auth Simulation
-    // In a real app, this would receive the ID token from Google and verify it
+    const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
+    
+    const options = {
+        redirect_uri: `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/google/callback`,
+        client_id: process.env.GOOGLE_CLIENT_ID || "",
+        access_type: "offline",
+        response_type: "code",
+        prompt: "consent",
+        scope: [
+            "https://www.googleapis.com/auth/userinfo.profile",
+            "https://www.googleapis.com/auth/userinfo.email",
+        ].join(" "),
+    };
+
+    const qs = new URLSearchParams(options);
+    const url = `${rootUrl}?${qs.toString()}`;
+    
+    redirect(url);
+}
+
+export async function googleSimulatedLogin() {
+    // Phase 8: Google Auth Simulation (Backup/Legacy)
     const mockGoogleId = "google-" + Math.random().toString(36).substring(2, 11);
     
     await createSession({

@@ -45,7 +45,7 @@ export async function createSession(userSession: UserSession) {
 
   cookieStore.set("session", session, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production" && !process.env.VERCEL_URL?.includes('localhost'),
     expires: expiresAt,
     sameSite: "lax",
     path: "/",
@@ -64,7 +64,7 @@ export async function updateSession() {
   const cookieStore = await cookies();
   cookieStore.set("session", session, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production" && !process.env.VERCEL_URL?.includes('localhost'),
     expires: expires,
     sameSite: "lax",
     path: "/",

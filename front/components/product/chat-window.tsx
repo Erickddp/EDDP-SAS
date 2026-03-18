@@ -26,6 +26,8 @@ interface SessionAvatarResponse {
     avatarUrl: string;
     googleAvatarUrl: string | null;
     lockedByGoogle: boolean;
+    role?: "user" | "guest" | "admin";
+    questionCount?: number;
 }
 
 function getLatestExchange(messages: Message[]): Message[] {
@@ -55,9 +57,12 @@ export function ChatWindow({
     const [isTyping, setIsTyping] = useState(false);
     const [selectedArticle, setSelectedArticle] = useState<LawArticlePayload | null>(null);
     const [isViewerOpen, setIsViewerOpen] = useState(false);
-    const [profile, setProfile] = useState<ChatUserProfile>({
+    const [profile, setProfile] = useState<SessionAvatarResponse>({
         avatarUrl: USER_AVATAR_OPTIONS[0].src,
-        googleAvatarUrl: null
+        googleAvatarUrl: null,
+        lockedByGoogle: false,
+        role: "guest",
+        questionCount: 0
     });
     const [isAvatarLockedByGoogle, setIsAvatarLockedByGoogle] = useState(false);
     const [isAvatarSaving, setIsAvatarSaving] = useState(false);
@@ -82,6 +87,7 @@ export function ChatWindow({
         const localProfile = Storage.getUserProfile();
         if (localProfile?.avatarUrl) {
             setProfile((prev) => ({
+                ...prev,
                 avatarUrl: localProfile.avatarUrl,
                 googleAvatarUrl: localProfile.googleAvatarUrl ?? prev.googleAvatarUrl ?? null
             }));
@@ -92,13 +98,13 @@ export function ChatWindow({
                 const response = await fetch("/api/session/avatar", { cache: "no-store" });
                 if (!response.ok) return;
                 const payload = await response.json() as SessionAvatarResponse;
-                const nextProfile: ChatUserProfile = {
-                    avatarUrl: payload.avatarUrl,
-                    googleAvatarUrl: payload.googleAvatarUrl ?? null
-                };
-                setProfile(nextProfile);
+                setProfile(payload);
                 setIsAvatarLockedByGoogle(payload.lockedByGoogle);
-                Storage.saveUserProfile(nextProfile);
+                // Save parts of it to local storage
+                Storage.saveUserProfile({
+                    avatarUrl: payload.avatarUrl,
+                    googleAvatarUrl: payload.googleAvatarUrl
+                });
             } catch (error) {
                 console.error("No se pudo sincronizar avatar:", error);
             }
@@ -266,7 +272,7 @@ export function ChatWindow({
         if (!nextAvatarUrl || nextAvatarUrl === profile.avatarUrl || isAvatarLockedByGoogle) return;
 
         const previousProfile = profile;
-        const optimisticProfile: ChatUserProfile = {
+        const optimisticProfile: SessionAvatarResponse = {
             ...profile,
             avatarUrl: nextAvatarUrl
         };
@@ -287,18 +293,25 @@ export function ChatWindow({
             }
 
             const payload = await response.json() as SessionAvatarResponse;
-            const nextProfile: ChatUserProfile = {
+            const nextProfile: SessionAvatarResponse = {
+                ...payload,
                 avatarUrl: payload.avatarUrl,
                 googleAvatarUrl: payload.googleAvatarUrl ?? null
             };
 
             setProfile(nextProfile);
             setIsAvatarLockedByGoogle(payload.lockedByGoogle);
-            Storage.saveUserProfile(nextProfile);
+            Storage.saveUserProfile({
+                avatarUrl: nextProfile.avatarUrl,
+                googleAvatarUrl: nextProfile.googleAvatarUrl
+            });
         } catch (error) {
             console.error(error);
             setProfile(previousProfile);
-            Storage.saveUserProfile(previousProfile);
+            Storage.saveUserProfile({
+                avatarUrl: previousProfile.avatarUrl,
+                googleAvatarUrl: previousProfile.googleAvatarUrl
+            });
         } finally {
             setIsAvatarSaving(false);
         }
@@ -321,8 +334,12 @@ export function ChatWindow({
                             <img src="/icono.png" alt="MyFiscal" className="w-full h-full object-contain" />
                         </div>
                         <div>
-                            <h1 className="text-sm font-bold text-text-main">Consulta Fiscal MyFiscal</h1>
-                            <p className="text-[10px] text-text-sec uppercase tracking-widest opacity-60">Motor de análisis v1.0</p>
+                             <h1 className="text-sm font-bold text-text-main">
+                                {profile.role === 'guest' ? `Invitado (${profile.questionCount}/2)` : 'Consulta Fiscal MyFiscal'}
+                            </h1>
+                            <p className="text-[10px] text-text-sec uppercase tracking-widest opacity-60">
+                                {profile.role === 'guest' ? 'Límite de Prueba' : 'Motor de análisis v1.0'}
+                            </p>
                         </div>
                     </div>
 

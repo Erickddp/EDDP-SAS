@@ -6,7 +6,7 @@ function applySessionCookie(response: NextResponse, token: string) {
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   response.cookies.set("session", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production" && !process.env.VERCEL_URL?.includes('localhost'),
     expires,
     sameSite: "lax",
     path: "/",
@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
     effectiveAvatarUrl,
     options: USER_AVATAR_OPTIONS,
     lockedByGoogle: Boolean(session.googleAvatarUrl),
+    role: session.role,
+    questionCount: session.questionCount ?? 0,
   });
 }
 
