@@ -105,6 +105,9 @@ export interface StructuredAnswer {
         ref: string;
         role: "definition" | "procedure" | "sanction" | "correlation" | "exception";
     }>;
+    // Phase 7C - Intelligence & Persona
+    deductiveInsight?: string;
+    proactiveQuestion?: string;
     // Adaptive fields (present only in complex responses)
     relatedArticles?: string[];
     legalInterpretation?: string;

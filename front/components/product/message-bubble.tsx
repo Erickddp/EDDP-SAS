@@ -70,6 +70,18 @@ function normalizeStructured(answer: StructuredAnswer) {
         formula: typeof answer.formula === "string" ? answer.formula : "",
         variables: normalizeList(answer.variables),
         ejemploNumerico: typeof answer.ejemploNumerico === "string" ? answer.ejemploNumerico : "",
+        // Phase 7B - Specific Basis
+        primaryBasis: answer.primaryBasis ? {
+            ref: String(answer.primaryBasis.ref || ""),
+            law: String(answer.primaryBasis.law || ""),
+            articleNumber: String(answer.primaryBasis.articleNumber || ""),
+            subsection: String(answer.primaryBasis.subsection || ""),
+            whySelected: String(answer.primaryBasis.whySelected || "")
+        } : null,
+        supportingBasis: Array.isArray(answer.supportingBasis) ? answer.supportingBasis : [],
+        // Phase 7C - Intelligence & Persona
+        deductiveInsight: typeof answer.deductiveInsight === "string" ? answer.deductiveInsight : "",
+        proactiveQuestion: typeof answer.proactiveQuestion === "string" ? answer.proactiveQuestion : "",
         // Intent: plazo
         fechaLimite: typeof answer.fechaLimite === "string" ? answer.fechaLimite : "",
         periodicidad: typeof answer.periodicidad === "string" ? answer.periodicidad : "",
@@ -231,41 +243,85 @@ function StructuredResponseView({
                                 <p className="text-sm text-text-main leading-relaxed whitespace-pre-line">{data.legalInterpretation}</p>
                             </div>
                         )}
+
+                        {/* Phase 7C: Deductive Insight */}
+                        {data.deductiveInsight && (
+                            <div className="rounded-xl bg-cyan-main/[0.03] border border-cyan-main/15 p-4 shadow-[0_0_15px_rgba(32,196,255,0.05)]">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Sparkles size={14} className="text-cyan-main animate-pulse" />
+                                    <span className="text-[10px] font-black text-cyan-main uppercase tracking-widest">Recomendación MyFiscal</span>
+                                </div>
+                                <p className="text-sm text-text-main/90 leading-relaxed italic border-l-2 border-cyan-main/30 pl-3">
+                                    &quot;{data.deductiveInsight}&quot;
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
 
             {/* 3. FUNDAMENTO LEGAL */}
-            {(data.foundation.length > 0 || data.relatedArticles.length > 0) && (
+            {(data.primaryBasis || data.foundation.length > 0 || data.supportingBasis.length > 0) && (
                 <div className="space-y-3">
                     <h4 className="flex items-center gap-2 text-[11px] font-black text-cyan-main uppercase tracking-[0.2em]">
                         <FileText size={14} className="text-cyan-main/70" /> FUNDAMENTO LEGAL
                     </h4>
-                    <div className="rounded-xl bg-bg-main border border-border-glow shadow-sm p-5 space-y-4">
-                        {data.foundation.length > 0 && (
-                            <div className="space-y-2">
-                                {data.foundation.map((f, i) => (
-                                    <p key={i} className="text-sm text-text-main leading-relaxed flex gap-3">
-                                        <span className="text-cyan-main font-bold mt-0.5">•</span> 
-                                        <span>{f}</span>
-                                    </p>
-                                ))}
-                                <CitationBlock refs={data.foundationCitations} citations={data.citations} />
-                            </div>
-                        )}
-
-                        {data.relatedArticles.length > 0 && (
-                            <div className="pt-3 border-t border-border-glow/40">
-                                <p className="text-[10px] font-bold text-text-sec uppercase tracking-widest mb-2 opacity-70">Disposiciones Complementarias</p>
-                                <div className="grid gap-2 sm:grid-cols-2">
-                                    {data.relatedArticles.map((art, i) => (
-                                        <p key={i} className="text-[13px] text-text-sec leading-relaxed flex gap-2 items-center bg-bg-sec/30 p-2 rounded-lg border border-border-glow/30">
-                                            <ArrowRight size={10} className="text-cyan-main/40" /> {art}
+                    
+                    <div className="space-y-4">
+                        {/* Primary Basis Highlight */}
+                        {data.primaryBasis && (
+                            <div className="rounded-xl bg-cyan-main/[0.03] border-2 border-cyan-main/20 shadow-sm p-4 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <Sparkles size={40} className="text-cyan-main" />
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <div className="mt-1 bg-cyan-main/10 p-1.5 rounded-lg">
+                                        <Bookmark size={16} className="text-cyan-main" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h5 className="text-[10px] font-black text-cyan-main uppercase tracking-widest">Base Jurídica Primaria</h5>
+                                        <p className="text-sm font-bold text-text-main">
+                                            {data.primaryBasis.law} Art. {data.primaryBasis.articleNumber}
+                                            {data.primaryBasis.subsection && <span className="ml-1 text-cyan-main/80 font-medium">({data.primaryBasis.subsection})</span>}
                                         </p>
-                                    ))}
+                                        <p className="text-xs text-text-sec leading-relaxed italic mt-1">&quot;{data.primaryBasis.whySelected}&quot;</p>
+                                    </div>
                                 </div>
                             </div>
                         )}
+
+                        <div className="rounded-xl bg-bg-main border border-border-glow shadow-sm p-5 space-y-4">
+                            {data.foundation.length > 0 && (
+                                <div className="space-y-2">
+                                    {data.foundation.map((f, i) => (
+                                        <p key={i} className="text-sm text-text-main leading-relaxed flex gap-3">
+                                            <span className="text-cyan-main font-bold mt-0.5">•</span> 
+                                            <span>{f}</span>
+                                        </p>
+                                    ))}
+                                    <CitationBlock refs={data.foundationCitations} citations={data.citations} />
+                                </div>
+                            )}
+
+                            {data.supportingBasis.length > 0 && (
+                                <div className="pt-3 border-t border-border-glow/40">
+                                    <p className="text-[10px] font-black text-text-sec uppercase tracking-widest mb-3 opacity-70">Disposiciones de Apoyo</p>
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        {data.supportingBasis.map((b, i) => (
+                                            <div key={i} className="text-[12px] text-text-sec leading-relaxed flex items-center justify-between bg-bg-sec/30 p-2.5 rounded-lg border border-border-glow/30">
+                                                <div className="flex items-center gap-2">
+                                                    <ArrowRight size={10} className="text-cyan-main/40" />
+                                                    <span className="font-medium">{b.ref}</span>
+                                                </div>
+                                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-bg-main border border-border-glow/50 text-text-sec/60 uppercase font-bold tracking-tighter">
+                                                    {b.role}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
@@ -344,6 +400,23 @@ function StructuredResponseView({
                                 className="p-3 bg-white dark:bg-bg-sec hover:border-cyan-main/30 hover:shadow-md transition-all"
                             />
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 6. PRÓXIMO PASO */}
+            {data.proactiveQuestion && (
+                <div className="pt-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                    <div className="flex items-center gap-3 bg-bg-main/40 border border-border-glow/40 rounded-2xl p-4 group hover:border-cyan-main/30 transition-all cursor-default">
+                        <div className="bg-cyan-main/10 p-2 rounded-xl group-hover:bg-cyan-main/20 transition-colors">
+                            <MessageCircle size={18} className="text-cyan-main" />
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-black text-text-sec uppercase tracking-[0.1em] opacity-60">Sugerencia inteligente</p>
+                            <p className="text-sm text-text-main/90 font-medium italic group-hover:text-cyan-main/90 transition-colors">
+                                ¿{data.proactiveQuestion.startsWith("¿") ? data.proactiveQuestion.substring(1) : data.proactiveQuestion}?
+                            </p>
+                        </div>
                     </div>
                 </div>
             )}

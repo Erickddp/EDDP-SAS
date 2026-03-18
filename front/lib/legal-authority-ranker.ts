@@ -152,13 +152,14 @@ export function rankLegalAuthority(
         else if (intent.intentType === "plazo" && (normalizedText.includes("plazo") || normalizedText.includes("fecha"))) role = "procedure";
         else if (isDefinitional) role = "definition";
 
-        return {
+        const result = {
             article,
             score,
             reasons,
-            isPrimary: false, // will set later
+            isPrimary: false,
             role
         };
+        return result;
     });
 
     // Sort by score

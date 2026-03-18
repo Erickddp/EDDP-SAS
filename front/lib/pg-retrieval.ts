@@ -39,16 +39,17 @@ export async function searchPostgresArticles(
             SELECT 
                 a.id, a.document_id, d.document_name, d.abbreviation,
                 a.article_number, a.title, a.text as content, d.source, d.status,
-                -- Scoring Híbrido:
-                (CASE WHEN d.abbreviation = $2::text AND a.article_number = $3::text THEN 100 ELSE 0 END) + -- BOOST EXACTO
-                (CASE WHEN $4::vector IS NOT NULL THEN (1 - (a.embedding <=> $4::vector)) * 20 ELSE 0 END) + -- BOOST SEMÁNTICO
-                (CASE WHEN a.text ILIKE ANY($5::text[]) THEN 5 ELSE 0 END) -- BOOST LÉXICO
-                AS combined_score
+                -- Scoring Híbrido Optimizado (Fase 3)
+                (CASE WHEN d.abbreviation = $2::text AND a.article_number = $3::text THEN 200 ELSE 0 END) + -- BOOST EXACTO (Aumentado)
+                (CASE WHEN $4::vector IS NOT NULL THEN (1 - (a.embedding <=> $4::vector)) * 40 ELSE 0 END) + -- BOOST SEMÁNTICO (Aumentado de 20 a 40)
+                (CASE WHEN a.text ILIKE ANY($5::text[]) THEN 10 ELSE 0 END) -- BOOST LÉXICO (Aumentado de 5 a 10)
+                AS combined_score,
+                (CASE WHEN $4::vector IS NOT NULL THEN (1 - (a.embedding <=> $4::vector)) ELSE 0 END) AS semantic_sim
             FROM articles a
             JOIN documents d ON d.id = a.document_id
             WHERE 
                 (d.abbreviation = $2::text AND a.article_number = $3::text) -- Match exacto
-                OR ($4::vector IS NOT NULL AND (1 - (a.embedding <=> $4::vector)) > 0.4) -- Match semántico
+                OR ($4::vector IS NOT NULL AND (1 - (a.embedding <=> $4::vector)) > 0.35) -- Match semántico (Umbral bajado a 0.35 para mayor exhaustividad)
                 OR (($3::text IS NULL OR $3::text = '') AND (
                     a.text ILIKE ANY($5::text[]) OR a.title ILIKE ANY($5::text[])
                 )) -- Match léxico
@@ -65,7 +66,10 @@ export async function searchPostgresArticles(
         ]);
 
         if (primaryRows.length > 0) {
-            console.log(`📡 [PG-Retrieval] ${primaryRows.length} resultados híbridos en 'articles'.`);
+            console.log(`📡 [PG-Retrieval] Encontrados ${primaryRows.length} resultados en 'articles'.`);
+            primaryRows.forEach((r, i) => {
+                console.log(`   ${i+1}. [${r.abbreviation}] Art. ${r.article_number} - Score: ${Number(r.combined_score).toFixed(2)} (Sem: ${Number(r.semantic_sim).toFixed(3)})`);
+            });
             return primaryRows.map(r => ({
                 id: r.id,
                 documentId: r.document_id,
@@ -80,16 +84,17 @@ export async function searchPostgresArticles(
             }));
         }
 
-        // 3. Fallback Híbrido a 'legal_documents' (Esquema anterior)
+        // 3. Fallback Híbrido a 'legal_documents' (Esquema anterior/deprecado)
+        console.log(`📡 [PG-Retrieval] No hay resultados en 'articles', intentando fallback a 'legal_documents'...`);
         const sqlHybridFallback = `
             SELECT 
                 l.id::text, l.document_name, l.abbreviation, l.article_number, l.title, l.content,
-                (CASE WHEN l.abbreviation = $2::text AND l.article_number = $3::text THEN 100 ELSE 0 END) +
-                (CASE WHEN $4::vector IS NOT NULL THEN (1 - (l.embedding <=> $4::vector)) * 20 ELSE 0 END)
+                (CASE WHEN l.abbreviation = $2::text AND l.article_number = $3::text THEN 150 ELSE 0 END) +
+                (CASE WHEN $4::vector IS NOT NULL THEN (1 - (l.embedding <=> $4::vector)) * 30 ELSE 0 END)
                 AS combined_score
             FROM legal_documents l
             WHERE (l.abbreviation = $2::text AND l.article_number = $3::text)
-               OR ($4::vector IS NOT NULL AND (1 - (l.embedding <=> $4::vector)) > 0.4)
+               OR ($4::vector IS NOT NULL AND (1 - (l.embedding <=> $4::vector)) > 0.35)
             ORDER BY combined_score DESC
             LIMIT $1::int
         `;

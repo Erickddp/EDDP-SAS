@@ -9,6 +9,7 @@ import { parseLegalReference } from "@/lib/law-alias";
 import { analyzeQueryWithDebug } from "@/lib/query-analyzer";
 import { RETRIEVAL_CONFIG } from "@/lib/retrieval-config";
 import { getConversationContext, updateConversationContext, detectFollowUp } from "@/lib/conversation-context";
+import { getSession } from "@/lib/session";
 import { buildRetrievalPlan } from "@/lib/retrieval-optimizer";
 import { filterArticlesByRelevance } from "@/lib/article-relevance";
 import { extractArticleFragments } from "@/lib/article-fragment";
@@ -21,6 +22,13 @@ export async function POST(req: Request) {
         if (!body.message || !body.conversationId) {
             return NextResponse.json({ error: "Mensaje u ID de conversación faltante" }, { status: 400 });
         }
+
+        // 0. Get User Session (Phase 7C)
+        const session = await getSession();
+        const userContext = session ? {
+            name: session.name,
+            role: session.role
+        } : undefined;
 
         // ──────────────────────────────────────────────────────────────────
         // 0. Conversation Memory — detect follow-ups
@@ -160,7 +168,6 @@ export async function POST(req: Request) {
         };
 
         if (queryAnalysis.structuredIntent) {
-            console.log(`│ Articles before ranker: ${context.retrievedArticles.map(a => `${a.documentAbbreviation} ${a.articleNumber}`).join(", ")}`);
             ranking = rankLegalAuthority(
                 body.message,
                 queryAnalysis.structuredIntent,
@@ -216,7 +223,8 @@ export async function POST(req: Request) {
                                 parsedRef,
                                 queryAnalysis,
                                 isFollowUp: followUpResult.isFollowUp,
-                                previousTopic: previousContext?.lastTopic
+                                previousTopic: previousContext?.lastTopic,
+                                userContext
                             })
                         },
                         {

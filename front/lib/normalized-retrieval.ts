@@ -188,7 +188,7 @@ function scoreArticle(
     }
 
     if (preferredLaw && article.record.documentAbbreviation === preferredLaw) {
-        score += 100; // Stronger boost for preferred law
+        score += 500; // Massively prioritize preferred law if explicitly requested or inferred
     }
 
     const lawFilter = parsedRef?.lawAbbreviation || null;
@@ -272,9 +272,6 @@ export function searchNormalizedArticles(
         }))
         .filter((entry) => entry.score >= -100)
         .sort((a, b) => b.score - a.score);
-
-    console.log(`│ Retrieval: tokens=[${tokens.join(", ")}] | preferred=${preferredLaw} | corpus=${corpus.articles.length} | bestScore=${scored[0]?.score}`);
-    console.log(`│ Top 5 Retrieval: ${scored.slice(0, 5).map(m => `${m.article.record.documentAbbreviation} ${m.article.record.articleNumber} (${m.score})`).join(", ")}`);
 
     if (scored.length === 0) {
         return [];
