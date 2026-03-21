@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, AlertCircle, Zap, CreditCard, Activity, Calendar } from "lucide-react";
+import { CheckCircle2, AlertCircle, Zap, CreditCard, Activity, Calendar, UserIcon } from "lucide-react";
+import { ProfileSelector } from "@/components/product/profile-selector";
+
 
 interface BillingStatus {
     plan: string;
@@ -20,7 +22,9 @@ interface BillingStatus {
         currentPeriodEnd: string;
         provider: string;
     } | null;
+    professionalProfile: string;
 }
+
 
 export default function AccountPage() {
     const [status, setStatus] = useState<BillingStatus | null>(null);
@@ -179,6 +183,18 @@ export default function AccountPage() {
                             </div>
                         </div>
 
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-2">
+                                <UserIcon className="text-cyan-main" size={24} />
+                                <h2 className="text-2xl font-bold text-text-main">Perfil Profesional</h2>
+                            </div>
+                            <p className="text-text-sec">
+                                Personaliza cómo MyFiscal responde a tus consultas. Cada perfil ajusta el tono, tecnicismo y estructura de la respuesta.
+                            </p>
+                            
+                            <ProfileSelector currentProfile={status?.professionalProfile} />
+                        </div>
+
                         {/* Info Section */}
                         {!isPro && (
                             <div className="rounded-2xl bg-gradient-to-r from-cyan-900/20 to-blue-900/20 border border-cyan-500/20 p-8 flex flex-col md:flex-row items-center gap-6">
@@ -200,3 +216,4 @@ export default function AccountPage() {
         </div>
     );
 }
+

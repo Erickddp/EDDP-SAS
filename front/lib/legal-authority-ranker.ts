@@ -21,11 +21,12 @@ export interface AuthorityRankingResult {
 const DOMAIN_PRIORITY: Record<string, string[]> = {
     "fiscal:multa": ["CFF", "LISR", "LIVA", "LIEPS"],
     "fiscal:plazo": ["CFF", "LISR", "LIVA"],
-    "fiscal:calculo": ["LISR", "LIVA", "CFF"],
+    "fiscal:calculo": ["RESICO", "LISR", "LIVA", "CFF"],
     "fiscal:fundamentar": ["CFF", "LA", "LIEPS"],
     "fiscal:procedimiento": ["CFF", "LFPA"],
-    "fiscal:consulta": ["CFF", "LISR", "LIVA", "LA"],
-    "fiscal:general": ["CFF", "LISR", "LIVA"],
+    "fiscal:consulta": ["RESICO", "CFF", "LISR", "LIVA", "LA"],
+    "fiscal:general": ["RESICO", "CFF", "LISR", "LIVA"],
+
     "constitucional:derechos": ["CPEUM", "LAmparo"],
     "administrativo:multa": ["CFF", "LFPA"],
     "administrativo:procedimiento": ["LFPA", "CFF"]

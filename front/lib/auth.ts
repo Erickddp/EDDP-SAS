@@ -1,3 +1,5 @@
+"use server";
+
 import { query } from "./db";
 import { UserSession, createSession, deleteSession } from "./session";
 import bcrypt from "bcryptjs";
@@ -48,7 +50,7 @@ export async function loginUser(email: string, password?: string) {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role as "user" | "admin",
+        role: user.role as "user" | "admin" | "guest",
         plan: "gratis",
         subscriptionStatus: "active" // Default for now
     };
@@ -62,7 +64,7 @@ export async function logout() {
 }
 
 /**
- * SERVER ACTIONS (Phase 4 UI compatibility)
+ * SERVER ACTIONS
  */
 
 export async function login(prevState: any, formData: FormData) {
@@ -109,15 +111,11 @@ export async function register(prevState: any, formData: FormData) {
 }
 
 export async function googleLogin() {
-    // Phase 4: Placeholder for real Google Auth redirect
-    // Eventually: redirect(googleAuthUrl)
     console.log("Google Auth requested - Redirecting to chat (Mock)");
     redirect("/chat");
 }
 
 export async function guestLogin() {
-    // Phase 4: Guests are recorded with NULL UUIDs in usage_logs
-    // but they still need a session ID to track their 2-question limit
     const guestSession: UserSession = {
         id: `guest-${Math.random().toString(36).substring(2, 11)}`,
         email: "guest@myfiscal.io",

@@ -44,8 +44,10 @@ export async function GET(req: Request) {
                 id: subscription.id,
                 currentPeriodEnd: subscription.current_period_end,
                 provider: subscription.provider
-            } : null
+            } : null,
+            professionalProfile: session.professionalProfile || "entrepreneur"
         });
+
     } catch (error: any) {
         return handleApiError(error, AppErrorType.DATABASE);
     }

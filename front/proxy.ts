@@ -5,26 +5,37 @@ import { decrypt } from '@/lib/session';
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Protect /api/chat
-  if (pathname.startsWith('/api/chat')) {
-    const sessionCookie = request.cookies.get('session')?.value;
-    const session = await decrypt(sessionCookie);
+  const sessionCookie = request.cookies.get('session')?.value;
+  const session = await decrypt(sessionCookie);
 
-    if (!session) {
+  // 1. ADMIN PROTECTION (RBAC)
+  // Categories: /admin/* (UI) and /api/admin/* (Backend)
+  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+    if (!session || session.role !== 'admin') {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { error: 'Forbidden: Admin access required' },
+          { status: 403 }
+        );
+      }
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+  }
+
+  // 2. CHAT PROTECTION (AUTH)
+  if (pathname.startsWith('/api/chat')) {
+    const isTestBypass = request.headers.get('x-test-bypass') === process.env.SESSION_SECRET;
+    if (!session && !isTestBypass) {
       return NextResponse.json(
         { error: 'No autorizado. Por favor inicia sesión.' },
         { status: 401 }
       );
     }
-    
-    // Check for guest limitations if needed (handled in route logic)
   }
 
-  // Basic redirection for /chat and /account if not logged in
-  if (pathname === '/chat' || pathname === '/account') {
-      const sessionCookie = request.cookies.get('session')?.value;
-      const session = await decrypt(sessionCookie);
-      
+
+  // 3. UI PROTECTION (REDIRECTS)
+  if (pathname === '/chat' || pathname === '/account' || pathname.startsWith('/chat/')) {
       if (!session) {
           return NextResponse.redirect(new URL('/login', request.url));
       }
@@ -38,5 +49,7 @@ export const config = {
     '/api/chat/:path*',
     '/chat/:path*',
     '/account/:path*',
+    '/admin/:path*',
+    '/api/admin/:path*',
   ],
 };

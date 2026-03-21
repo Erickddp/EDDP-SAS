@@ -40,8 +40,9 @@ export const ARTICLE_LIMIT_RULES: Record<string, ArticleLimitRule> = {
     followUp: { min: 1, max: 1, label: "follow-up (1 article)" },
     simple: { min: 1, max: 2, label: "simple (1–2 articles)" },
     detailed: { min: 3, max: 4, label: "detailed (3–4 articles)" },
-    technical: { min: 5, max: 7, label: "technical (5–7 articles)" }
+    technical: { min: 5, max: 10, label: "technical (5–10 articles)" }
 };
+
 
 /**
  * Computes the effective article limit based on detail level and follow-up status.

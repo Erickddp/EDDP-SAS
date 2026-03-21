@@ -1,10 +1,12 @@
-import OpenAI from "openai";
+import { openai } from "./openai";
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
 
 export async function generateEmbedding(text: string): Promise<number[]> {
+    if (!openai) {
+        throw new Error("Missing OPENAI_API_KEY for embedding generation.");
+    }
+
+
     const response = await openai.embeddings.create({
         model: "text-embedding-3-small",
         input: text,

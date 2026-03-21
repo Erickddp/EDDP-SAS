@@ -64,8 +64,10 @@ const COMPLEX_PHRASES = [
     "fundamento legal", "base legal",
     "interpretación", "interpretacion",
     "cálculo de", "calculo de",
-    "multa y recargo", "actualización y recargo", "actualizacion y recargo"
+    "multa y recargo", "actualización y recargo", "actualizacion y recargo",
+    "diferencias en", "obligaciones de"
 ];
+
 
 const CALCULATION_INDICATORS = [
     "calcul", "porcentaje", "%", "tasa", "cuota", "monto",
@@ -102,8 +104,12 @@ function computeQueryScore(query: string) {
     score += Math.min(legalKeywordCount, 6);
     score += complexPhraseCount * 3;
     if (hasCalculation) score += 3;
-    if (multiLawRef) score += 4;
+    if (lawRefsFound.length >= 2) score += 6; // Heavy weight for multi-law
+    if (multiLawRef) score += 2;
+    if (wordCount > 30) score += 3; // Length indicates detail
     if (hasNumbers) score += 1;
+
+
 
     return {
         normalized, wordCount, matchedKeywords, legalKeywordCount,
@@ -118,9 +124,10 @@ function resolveComplexityAndDetail(
     userDetailLevel: DetailLevel
 ) {
     let heuristicComplexity: QueryAnalysis["complexity"];
-    if (score <= 2) heuristicComplexity = "simple";
-    else if (score <= 9) heuristicComplexity = "normal";
+    if (score <= 5) heuristicComplexity = "simple";
+    else if (score <= 12) heuristicComplexity = "normal"; // Lowered slightly from 14
     else heuristicComplexity = "complex";
+
 
     let complexity = heuristicComplexity;
     let elevatedByUser = false;

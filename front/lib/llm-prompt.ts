@@ -128,12 +128,42 @@ export function buildSystemPrompt(config: PromptConfig): string {
         rawSchema = rawSchema.replace(/,\s*}/g, '\n}');
     }
 
-    // Personalization Rules (Phase 8C)
+    // Personalization Rules (Phase 7: Profiles)
+    let profileInstructions = "";
+    const profile = userContext?.professionalProfile?.toLowerCase() || "general";
+    
+    if (profile === "entrepreneur" || profile === "emprendedor") {
+        profileInstructions = `
+### REGLAS PARA PERFIL: EMPRENDEDOR
+- LENGUAJE: Usa un lenguaje de negocios claro, evita tecnicismos innecesarios.
+- ESTRUCTURA: Usa viñetas y pasos a seguir ("Action Items").
+- RESUMEN: Enfócate en el "qué hacer" y el impacto financiero inmediato.
+- TABLAS: Si hay cálculos, preséntalos en una tabla simple.
+`;
+    } else if (profile === "accountant" || profile === "contador") {
+        profileInstructions = `
+### REGLAS PARA PERFIL: CONTADOR
+- LENGUAJE: Técnico y preciso (NIF, bases gravables, tasas).
+- CITAS: Exige citas exhaustivas de fracciones e incisos. Menciona la correlación con otras leyes si aplica.
+- CÁLCULOS: Desglosa la base gravable, tasa y resultado paso a paso.
+- RIGOR: Prioriza la vigencia y las reglas de resolución miscelánea si los fragmentos lo permiten.
+`;
+    } else if (profile === "lawyer" || profile === "abogado") {
+        profileInstructions = `
+### REGLAS PARA PERFIL: ABOGADO
+- LENGUAJE: Formal y jurídico (jurisprudencia, criterios, procedibilidad).
+- ESTRUCTURA: Organiza la respuesta como un dictamen o nota técnica.
+- FUNDAMENTACIÓN: Prioriza la jerarquía normativa y las facultades de la autoridad.
+- DEFENSA: Menciona posibles medios de defensa si el escenario lo sugiere.
+`;
+    }
+
     const personalizationRules = userContext 
         ? `\n### PERSONALIZACIÓN (PHASE 8C)
 1. SALUDO: Saluda a ${userContext.name} de forma natural al inicio.
-2. CONTEXTO PROFESIONAL: ${userContext.professionalProfile ? `Dado que el usuario es ${userContext.professionalProfile}, adapta tus "Deductive Insights" a su nivel técnico.` : "Adapta tu lenguaje a un profesional fiscal general."}
+2. CONTEXTO PROFESIONAL: Usuario identificado como **${profile}**. ${profileInstructions}
 ` : "";
+
 
     let systemInstructions = `Eres MyFiscal, un motor de razonamiento jurídico experto en leyes mexicanas (CFF, LISR, LIVA).
 OBJETIVO: Responder con precisión quirúrgica, fundamentación exacta y autoridad legal.
@@ -146,6 +176,7 @@ Debes organizar tu respuesta mentalmente en estas 6 secciones, aunque el JSON la
 4. **FUNDAMENTO LEGAL**: Identificación de bases en "primaryBasis" y "supportingBasis".
 5. **ESCENARIOS**: Aplicación práctica en "scenarios".
 6. **PRÓXIMO PASO**: Termina con una "proactiveQuestion" que anticipe la siguiente duda lógica del usuario.
+7. **CITAS TÉCNICAS**: Genera SIEMPRE un array de objetos "citations" vinculando cada ref_N con el [ID: ...] real del contexto legal proporcionado.
 
 ### PERSONALIDAD Y TONO
 Tu identidad para esta consulta es: **${persona.title}**.

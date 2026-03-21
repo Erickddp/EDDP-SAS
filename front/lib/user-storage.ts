@@ -108,6 +108,41 @@ export async function createUser(data: Omit<User, "id" | "createdAt" | "plan" | 
     }
 }
 
+export async function getUserById(id: string): Promise<User | undefined> {
+    const { rows } = await query(
+        `SELECT * FROM users WHERE id = $1`,
+        [id]
+    );
+
+    if (rows.length === 0) return undefined;
+
+    const u = rows[0];
+    const { rows: subRows } = await query(
+        `SELECT plan_type, status, current_period_end 
+         FROM subscriptions WHERE user_id = $1 LIMIT 1`,
+        [u.id]
+    );
+
+    const subscription = subRows[0];
+    const now = new Date();
+    const isPeriodValid = !subscription?.current_period_end || new Date(subscription.current_period_end) > now;
+    const isStatusValid = subscription?.status === 'active' || subscription?.status === 'trialing';
+    const isPlanActive = isStatusValid && isPeriodValid;
+
+    return {
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        avatarUrl: u.avatar_url,
+        passwordHash: u.password_hash,
+        plan: isPlanActive ? (subscription?.plan_type || "gratis") : "gratis",
+        professionalProfile: u.professional_profile || null,
+        subscriptionStatus: subscription?.status || "none",
+        createdAt: u.created_at
+    };
+}
+
 export async function getSubscriptionByUserId(userId: string) {
     const { rows } = await query(
         `SELECT * FROM subscriptions WHERE user_id = $1 LIMIT 1`,

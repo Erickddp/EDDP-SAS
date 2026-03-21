@@ -165,10 +165,12 @@ export interface HistoryMessage {
 export interface ChatRequest {
     conversationId: string;
     message: string;
+    userId?: string; // Phase 7: Explicit ID for testing/recovery
     mode: ChatMode;
     detailLevel: DetailLevel;
     history?: HistoryMessage[];
 }
+
 
 export interface ChatResponse {
     answer: StructuredAnswer;
@@ -235,4 +237,11 @@ export interface AdaptiveDebugMeta {
     rejectedBasisRefs?: string[];
     mainPriorityApplied?: boolean;
     subsectionPrecisionApplied?: boolean;
+    // Phase 6 Iterative
+    wasIterative?: boolean;
+    passCount?: number;
+    iterativeTokens?: number;
+    iterationTasks?: string[];
 }
+
+

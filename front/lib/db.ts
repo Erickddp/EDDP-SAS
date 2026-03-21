@@ -1,28 +1,31 @@
 import { Pool, QueryResult, QueryResultRow } from 'pg';
-import { CONFIG } from './env-config';
+import dotenv from "dotenv";
+import path from "path";
 
-const connectionString = CONFIG.DATABASE_URL;
+// Support standard loading for scripts
+dotenv.config(); // search current dir
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+
+const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-  console.warn('⚠️ DATABASE_URL not found in environment variables. Database features will be unavailable.');
+  console.warn('⚠️  DATABASE_URL not found (process.env.DATABASE_URL). Current CWD:', process.cwd());
 }
+
 
 const pool = new Pool({
   connectionString,
-  // Enforce SSL for Supabase compatibility
   ssl: {
     rejectUnauthorized: false
   },
-  // Supabase/Serverless best practices
   connectionTimeoutMillis: 15000,
   idleTimeoutMillis: 30000,
   max: 10,
   keepAlive: true,
 });
 
-/**
- * Execute a SQL query
- */
 export async function query<T extends QueryResultRow = any>(
   text: string,
   params?: any[]
@@ -30,10 +33,8 @@ export async function query<T extends QueryResultRow = any>(
   const start = Date.now();
   try {
     const res = await pool.query<T>(text, params);
-    const duration = Date.now() - start;
     return res;
   } catch (error: any) {
-    // Structured logging for debugging without revealing credentials
     console.error('❌ Database Query Error:', {
       message: error.message,
       code: error.code,
@@ -43,9 +44,6 @@ export async function query<T extends QueryResultRow = any>(
   }
 }
 
-/**
- * Get a client from the pool for transactions
- */
 export async function getClient() {
   const client = await pool.connect();
   return client;

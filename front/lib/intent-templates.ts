@@ -37,8 +37,9 @@ const INTENT_KEYWORDS: Record<Exclude<LegalIntent, "general">, string[]> = {
         "cuanto debo pagar", "factor de actualización", "factor de actualizacion",
         "coeficiente", "proporción", "proporcion", "determinar",
         "cuánto es", "cuanto es", "actualización de", "actualizacion de",
-        "recargos", "isr a pagar", "iva a pagar"
+        "recargos", "isr a pagar", "iva a pagar", "retención", "retencion"
     ],
+
     plazo: [
         "plazo", "fecha límite", "fecha limite", "vencimiento",
         "cuándo debo", "cuando debo", "cuándo se presenta", "cuando se presenta",

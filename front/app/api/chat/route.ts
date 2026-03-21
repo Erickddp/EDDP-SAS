@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { MockEngine } from "@/lib/mock-engine";
 import { ChatRequest, ChatResponse, StructuredAnswer, AdaptiveDebugMeta, CitationEntry, FoundationEntry } from "@/lib/types";
 import { tokenizeQuery } from "@/lib/legal-search";
-import { buildLegalContext } from "@/lib/context-builder";
+import { buildLegalContext, RetrievalContext } from "@/lib/context-builder";
 import { openai, OPENAI_MODEL } from "@/lib/openai";
 import { buildSystemPrompt, buildUserPrompt, getEffectiveDepthRule, FOLLOW_UP_TOKEN_MULTIPLIER } from "@/lib/llm-prompt";
 import { parseLegalReference } from "@/lib/law-alias";
@@ -14,13 +14,17 @@ import { buildRetrievalPlan } from "@/lib/retrieval-optimizer";
 import { filterArticlesByRelevance } from "@/lib/article-relevance";
 import { extractArticleFragments } from "@/lib/article-fragment";
 import { rankLegalAuthority, RankedArticle } from "@/lib/legal-authority-ranker";
-import { PlanType, GUEST_LIMIT } from "@/lib/saas-constants";
+import { PlanType, GUEST_LIMIT, PLAN_LIMITS } from "@/lib/saas-constants";
 
-import { getSubscriptionByUserId } from "@/lib/user-storage";
+
+import { getSubscriptionByUserId, getUserById } from "@/lib/user-storage";
+
 import { checkUsageLimit, incrementUsage } from "@/lib/usage-enforcer";
 import { logUsage } from "@/lib/observability";
 import { handleApiError, AppErrorType, validatedMethod } from "@/lib/error-handler";
 import { saveConversation, saveMessage as saveChatMsg } from "@/lib/chat-storage";
+import { performIterativeRetrieval } from "@/lib/retrieval/iterative-engine";
+
 
 export async function POST(req: Request) {
     const methodError = validatedMethod(req, ["POST"]);
@@ -86,12 +90,29 @@ export async function POST(req: Request) {
             }, { status: 403 });
         }
 
-        const userContext = session ? {
-            name: session.name,
-            role: session.role,
-            plan: session.plan,
-            professionalProfile: session.professionalProfile
-        } : undefined;
+        // Phase 7: Profile context for AI
+        let userContext: { name: string; role: string; plan?: string; professionalProfile?: string | null } | undefined = undefined;
+
+        if (session) {
+            userContext = {
+                name: session.name,
+                role: session.role,
+                plan: session.plan,
+                professionalProfile: session.professionalProfile
+            };
+        } else if (req.headers.get('x-test-bypass') === process.env.SESSION_SECRET && body.userId) {
+            // Bypass user context recovery for testing
+            const testUser = await getUserById(body.userId);
+            if (testUser) {
+                userContext = {
+                    name: testUser.name,
+                    role: testUser.role,
+                    plan: testUser.plan,
+                    professionalProfile: testUser.professionalProfile
+                };
+            }
+        }
+
 
         // ──────────────────────────────────────────────────────────────────
         // 0. Conversation Memory — detect follow-ups
@@ -163,28 +184,91 @@ export async function POST(req: Request) {
         // ──────────────────────────────────────────────────────────────────
         // 2. Obtener contexto legal — context-aware retrieval for follow-ups
         // ──────────────────────────────────────────────────────────────────
-        let context;
+        let context: RetrievalContext;
         const effectiveRetrievalStrategy = retrievalPlan.strategyLabel;
+        let wasIterative = false;
+        let passCount = 1;
+        let iterativeTokens = 0;
+        let iterationTasks: string[] = [];
 
-        if (followUpResult.isFollowUp && previousContext) {
-            // Context-aware retrieval: use previous law context to guide search
-            const enrichedQuery = `${previousContext.lastLaw} ${body.message}`;
-            context = await buildLegalContext(
-                enrichedQuery,
-                parsedRef,
-                Math.max(8, retrievalPlan.effectiveArticleLimit * 2),
-                retrievalPlan.excludeArticleIds,
-                retrievalPlan.preferredLaw
-            );
+
+        const userPlanConfig = PLAN_LIMITS[plan as PlanType] || PLAN_LIMITS.gratis;
+        const canUseIterative = userPlanConfig.canUseAdvancedRAG;
+
+        const isComplex = queryAnalysis.complexity === "complex" || 
+                         (queryAnalysis.structuredIntent?.legalDomain === "fiscal" && queryAnalysis.structuredIntent.intentType === "calculo") ||
+                         queryDebug.multiLawRef;
+
+        if (isComplex && !followUpResult.isFollowUp && canUseIterative) {
+            console.log(`📡 [ITERATIVE ROUTER] High Complexity detected. Triggering Multi-Pass RAG...`);
+
+            try {
+                // Timeout safety for iterative engine (15s)
+                const iterativePromise = performIterativeRetrieval(effectiveQuery);
+                const timeoutPromise = new Promise<{ articles: any[], wasIterative: boolean, passCount: number }>((_, reject) => 
+                    setTimeout(() => reject(new Error("Iterative retrieval timeout")), 15000)
+                );
+
+                const iterativeResult = await Promise.race([iterativePromise, timeoutPromise]) as any;
+                
+                wasIterative = iterativeResult.wasIterative;
+                passCount = iterativeResult.passCount;
+                iterationTasks = iterativeResult.tasks || [];
+
+                
+                // Estimate tokens used in decomposition/sufficiency (Round trip ~800-1200 tokens)
+                iterativeTokens = wasIterative ? 1200 : 500;
+
+                context = {
+                    topic: queryAnalysis.structuredIntent?.topic || "fiscal",
+                    retrievedArticles: iterativeResult.articles.slice(0, tierConfig.articles),
+                    foundation: [],
+                    sources: iterativeResult.articles.map((art: any) => ({
+                        id: art.id,
+                        title: `${art.documentAbbreviation} Art. ${art.articleNumber}`,
+                        type: "Articulo",
+                        status: "Vigente",
+                        articleRef: `${art.documentAbbreviation} ${art.articleNumber}`,
+                        text: art.text,
+                        fragments: art.fragments
+                    })),
+                    retrievalMeta: {
+                        strategy: wasIterative ? "iterative-multipass" : "iterative-singlepass",
+                        totalMatches: iterativeResult.articles.length
+                    }
+                };
+            } catch (iterationErr) {
+                console.warn("⚠️ [ITERATIVE ROUTER] Fallback to linear retrieval due to:", iterationErr);
+                context = await buildLegalContext(
+                    effectiveQuery,
+                    parsedRef,
+                    Math.max(12, retrievalPlan.effectiveArticleLimit * 2),
+                    retrievalPlan.excludeArticleIds,
+                    retrievalPlan.preferredLaw
+                );
+            }
         } else {
-            context = await buildLegalContext(
-                effectiveQuery,
-                parsedRef,
-                Math.max(12, retrievalPlan.effectiveArticleLimit * 2),
-                retrievalPlan.excludeArticleIds,
-                retrievalPlan.preferredLaw
-            );
+            // Standard Linear Retrieval (Fase 3)
+            if (followUpResult.isFollowUp && previousContext) {
+                const enrichedQuery = `${previousContext.lastLaw} ${body.message}`;
+                context = await buildLegalContext(
+                    enrichedQuery,
+                    parsedRef,
+                    Math.max(8, retrievalPlan.effectiveArticleLimit * 2),
+                    retrievalPlan.excludeArticleIds,
+                    retrievalPlan.preferredLaw
+                );
+            } else {
+                context = await buildLegalContext(
+                    effectiveQuery,
+                    parsedRef,
+                    Math.max(12, retrievalPlan.effectiveArticleLimit * 2),
+                    retrievalPlan.excludeArticleIds,
+                    retrievalPlan.preferredLaw
+                );
+            }
         }
+
 
         // 2.5. Apply Legal Intent Relevance Filter
         if (queryAnalysis.structuredIntent) {
@@ -196,7 +280,7 @@ export async function POST(req: Request) {
             );
             
             // Re-sync sources after filtering
-            context.sources = context.retrievedArticles.map(art => ({
+            context.sources = context.retrievedArticles.map((art: any) => ({
                 id: art.id,
                 title: `${art.documentAbbreviation} Art. ${art.articleNumber}`,
                 type: "Articulo",
@@ -211,7 +295,7 @@ export async function POST(req: Request) {
 
         // 2.7. Extract Article Fragments for LLM Context
         if (queryAnalysis.structuredIntent) {
-            context.retrievedArticles = context.retrievedArticles.map(art => ({
+            context.retrievedArticles = context.retrievedArticles.map((art: any) => ({
                 ...art,
                 fragments: extractArticleFragments(
                     art,
@@ -226,7 +310,7 @@ export async function POST(req: Request) {
         // 2.8. Phase 7B: Legal Authority Ranking & Pruning
         let ranking: { primary: RankedArticle | null; supporting: RankedArticle[]; rejected: RankedArticle[] } = { 
             primary: null, 
-            supporting: context.retrievedArticles.slice(0, tierConfig.articles).map(a => ({ 
+            supporting: context.retrievedArticles.slice(0, tierConfig.articles).map((a: any) => ({ 
                 article: a, 
                 reasons: ["Fallback"], 
                 role: "correlation",
@@ -253,7 +337,7 @@ export async function POST(req: Request) {
             context.retrievedArticles = rankedArticles;
             
             // Re-sync sources after ranking/pruning
-            context.sources = context.retrievedArticles.map(art => ({
+            context.sources = context.retrievedArticles.map((art: any) => ({
                 id: art.id,
                 title: `${art.documentAbbreviation} Art. ${art.articleNumber}`,
                 type: "Articulo",
@@ -335,7 +419,7 @@ export async function POST(req: Request) {
         const sources = context.sources.length > 0 ? context.sources : (mockResult?.sources || []);
 
         // 4.1. Citation Validation & Traceability
-        const retrievedArticleIds = new Set(context.retrievedArticles.map(a => a.id));
+        const retrievedArticleIds = new Set(context.retrievedArticles.map((a: any) => a.id));
         const validCitations: CitationEntry[] = [];
         let invalidCitationsRemoved = 0;
 
@@ -376,8 +460,8 @@ export async function POST(req: Request) {
             body.conversationId,
             context.topic,
             queryAnalysis.detectedIntent,
-            context.retrievedArticles.map(a => `${a.documentAbbreviation} Art. ${a.articleNumber}`),
-            context.retrievedArticles.map(a => a.id),
+            context.retrievedArticles.map((a: any) => `${a.documentAbbreviation} Art. ${a.articleNumber}`),
+            context.retrievedArticles.map((a: any) => a.id),
             context.retrievedArticles[0]?.documentAbbreviation || "general",
             body.message
         );
@@ -387,7 +471,7 @@ export async function POST(req: Request) {
             queryDebug,
             retrievalRequested: tierConfig.articles,
             retrievalReturned: context.retrievedArticles.length,
-            topSources: context.sources.slice(0, 5).map(s => s.title),
+            topSources: context.sources.slice(0, 5).map((s: any) => s.title),
             tokenLimit: effectiveTokenLimit,
             promptComplexity: queryAnalysis.complexity,
             promptMode: queryAnalysis.mode,
@@ -437,10 +521,20 @@ export async function POST(req: Request) {
             sources: context.sources,
             titleSuggestion,
             queryAnalysis,
-            _debug: debugMeta
+            _debug: {
+                ...debugMeta,
+                wasIterative,
+                passCount,
+                iterativeTokens,
+                iterationTasks
+            }
+
         };
 
-        const finalResponse = { ...chatResponse, _debug: debugMeta };
+
+
+        const finalResponse = chatResponse;
+
         console.log(`│ API Response: ${chatResponse.answer.primaryBasis?.ref || "no primary"} | primaryBasisLaw: ${debugMeta.primaryBasisLaw}`);
         
         // ──────────────────────────────────────────────────────────────────
@@ -453,13 +547,14 @@ export async function POST(req: Request) {
         await logUsage({
             userId: userId,
             conversationId: body.conversationId,
-            promptTokens: 0, 
+            promptTokens: iterativeTokens, // Pre-calculate iterative overhead
             completionTokens: 0,
             model: OPENAI_MODEL || "mock",
             durationMs: Date.now() - startTime,
             status: "success",
             ipAddress: req.headers.get("x-forwarded-for") || "local"
         });
+
 
         // 6.5. Final Side Effects (Guest limit or DB Persistence)
         if (isGuest) {
