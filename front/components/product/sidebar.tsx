@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Conversation } from "@/lib/types";
+import { UserSession } from "@/lib/session";
 
 interface SidebarProps {
     isOpen?: boolean;
@@ -17,6 +18,7 @@ interface SidebarProps {
     onRestore?: (id: string) => void;
     onDelete?: (id: string) => void;
     conversations: Conversation[];
+    user?: UserSession | null;
 }
 
 export function Sidebar({
@@ -28,7 +30,8 @@ export function Sidebar({
     onArchive,
     onRestore,
     onDelete,
-    conversations = []
+    conversations = [],
+    user
 }: SidebarProps) {
     const [joinedPro, setJoinedPro] = useState(false);
     const [showArchived, setShowArchived] = useState(false);
@@ -197,21 +200,34 @@ export function Sidebar({
                         <>
                             <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-main/10 blur-xl rounded-full" aria-hidden="true" />
                             <div className="text-[10px] font-bold text-cyan-main mb-1 uppercase tracking-widest opacity-80">Edición Beta</div>
-                            <h4 className="text-base font-bold text-text-main mb-3">Acceso Gratuito</h4>
-                            <Button
-                                variant={joinedPro ? "outline" : "primary"}
-                                size="sm"
-                                className={cn(
-                                    "w-full text-xs h-8 shadow-sm transition-all",
-                                    joinedPro ? "bg-green-400/10 border-green-400/30 text-green-400 hover:bg-green-400/20" : ""
-                                )}
-                                onClick={() => setJoinedPro(true)}
-                                disabled={joinedPro}
-                            >
-                                {joinedPro ? (
-                                    <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> ¡Anotado en lista!</span>
-                                ) : "Unirse a la Pro"}
-                            </Button>
+                            <h4 className="text-base font-bold text-text-main mb-3">
+                                {user && user.role !== 'guest' ? `Plan ${user.plan}` : 'Acceso Gratuito'}
+                            </h4>
+                            {user && user.role !== 'guest' ? (
+                                <p className="text-[10px] text-text-sec leading-relaxed">
+                                    Historial sincronizado y sin límites de prueba.
+                                </p>
+                            ) : (
+                                <>
+                                    <p className="text-[10px] text-text-sec mb-3 leading-relaxed">
+                                        Límite de 5 consultas para invitados. Regístrate para acceso ilimitado.
+                                    </p>
+                                    <Link href="/register" className="w-full">
+                                        <Button
+                                            variant={joinedPro ? "outline" : "primary"}
+                                            size="sm"
+                                            className={cn(
+                                                "w-full text-xs h-8 shadow-sm transition-all",
+                                                joinedPro ? "bg-green-400/10 border-green-400/30 text-green-400 hover:bg-green-400/20" : ""
+                                            )}
+                                        >
+                                            {joinedPro ? (
+                                                <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> ¡Anotado!</span>
+                                            ) : "Registrarse Gratis"}
+                                        </Button>
+                                    </Link>
+                                </>
+                            )}
                         </>
                     )}
                     {!isOpen && (

@@ -20,6 +20,7 @@ interface ChatWindowProps {
     initialMode: ChatMode;
     initialDetailLevel: DetailLevel;
     onPrefsChange: (mode: ChatMode, level: DetailLevel) => void;
+    user?: import("@/lib/session").UserSession | null;
 }
 
 interface SessionAvatarResponse {
@@ -49,7 +50,8 @@ export function ChatWindow({
     onNewConversation,
     initialMode,
     initialDetailLevel,
-    onPrefsChange
+    onPrefsChange,
+    user
 }: ChatWindowProps) {
     const [mode, setMode] = useState<ChatMode>(initialMode);
     const [detail, setDetail] = useState<DetailLevel>(initialDetailLevel);
@@ -81,14 +83,46 @@ export function ChatWindow({
 
     // Load messages when conversationId changes
     useEffect(() => {
-        if (conversationId) {
-            setMessages(Storage.getMessages(conversationId));
-        } else {
-            setMessages([]);
-        }
-    }, [conversationId]);
+        const loadMessages = async () => {
+            if (!conversationId) {
+                setMessages([]);
+                return;
+            }
+
+            if (user && user.role !== "guest") {
+                try {
+                    const res = await fetch(`/api/chat/history?conversationId=${conversationId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setMessages(data.messages || []);
+                    }
+                } catch (err) {
+                    console.error("Error loading messages from DB:", err);
+                    setMessages(Storage.getMessages(conversationId)); // Fallback
+                }
+            } else {
+                setMessages(Storage.getMessages(conversationId));
+            }
+        };
+
+        loadMessages();
+    }, [conversationId, user]);
 
     useEffect(() => {
+        // Hydrate from props if available
+        if (user) {
+            setProfile({
+                avatarUrl: user.avatarUrl || USER_AVATAR_OPTIONS[0].src,
+                googleAvatarUrl: user.googleAvatarUrl || null,
+                lockedByGoogle: !!user.googleAvatarUrl,
+                role: user.role,
+                questionCount: user.questionCount || 0,
+                professionalProfile: user.professionalProfile || null
+            });
+            setIsAvatarLockedByGoogle(!!user.googleAvatarUrl);
+            return;
+        }
+
         const localProfile = Storage.getUserProfile();
         if (localProfile?.avatarUrl) {
             setProfile((prev) => ({
@@ -105,7 +139,6 @@ export function ChatWindow({
                 const payload = await response.json() as SessionAvatarResponse;
                 setProfile(payload);
                 setIsAvatarLockedByGoogle(payload.lockedByGoogle);
-                // Save parts of it to local storage
                 Storage.saveUserProfile({
                     avatarUrl: payload.avatarUrl,
                     googleAvatarUrl: payload.googleAvatarUrl
@@ -116,7 +149,7 @@ export function ChatWindow({
         };
 
         syncAvatarProfile();
-    }, []);
+    }, [user]);
 
     // Auto-scroll
     useEffect(() => {
@@ -183,27 +216,56 @@ export function ChatWindow({
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                if (errorData.code === "GUEST_LIMIT_REACHED") {
+                if (errorData.code === "GUEST_LIMIT_REACHED" || response.status === 403 || errorData.code === "USAGE_LIMIT_EXCEEDED") {
+                    const isGuest = errorData.code === "GUEST_LIMIT_REACHED";
+                    const handleUpgrade = async () => {
+                        try {
+                            const res = await fetch("/api/billing/create-checkout", { method: "POST" });
+                            if (res.ok) {
+                                const { url } = await res.json();
+                                window.location.href = url;
+                            }
+                        } catch (err) {
+                            console.error("Error creating checkout session:", err);
+                        }
+                    };
+
                     const limitMessage: Message = {
                         id: (Date.now() + 2).toString(),
                         conversationId: targetConvId,
                         role: "assistant",
                         content: {
-                            summary: "¡Has descubierto el potencial de MyFiscal!",
-                            explanation: "Como invitado, has alcanzado tu límite de 2 consultas gratuitas. Para seguir obteniendo análisis legales de alta precisión, te invitamos a unirte a nuestra comunidad.",
-                            deductiveInsight: "Registrarte con Google es instantáneo y te permitirá mantener tu historial de consultas y acceder a funciones avanzadas de análisis jurídico.",
-                            proactiveQuestion: "¿Te gustaría continuar ahora mismo con tu cuenta de Google?",
+                            summary: isGuest ? "¡Has descubierto el potencial de MyFiscal!" : "Límite de Consultas Alcanzado",
+                            explanation: isGuest 
+                                ? "Como invitado, has alcanzado tu límite de consultas gratuitas. Para seguir obteniendo análisis legales de alta precisión, te invitamos a unirte a nuestra comunidad."
+                                : `Has alcanzado el límite de consultas permitidas para tu plan actual.`,
+                            deductiveInsight: isGuest
+                                ? "Registrarte con Google es instantáneo y te permitirá mantener tu historial de consultas y acceder a funciones avanzadas de análisis jurídico."
+                                : "Puedes actualizar tu plan en cualquier momento para obtener un límite superior y acceso a herramientas profesionales de análisis fiscal.",
+                            proactiveQuestion: isGuest 
+                                ? "¿Te gustaría continuar ahora mismo con tu cuenta de Google?" 
+                                : "¿Deseas subir a MyFiscal Pro ahora mismo?",
                             foundation: [],
-                            scenarios: ["Acceso ilimitado a consultas básicas", "Historial sincronizado en la nube", "Prioridad en análisis de leyes federales"],
+                            scenarios: isGuest 
+                                ? ["Acceso ilimitado a consultas básicas", "Historial sincronizado en la nube", "Prioridad en análisis de leyes federales"]
+                                : ["Consultas ilimitadas", "Exportación de análisis", "Soporte prioritario"],
                             consequences: [],
-                            certainty: "Alta",
-                            disclaimer: "Regístrate para continuar."
+                            certainty: "Sistema",
+                            disclaimer: isGuest ? "Regístrate para continuar." : "Actualiza tu plan para continuar."
                         },
                         createdAt: Date.now()
                     };
                     setMessages(prev => [...prev, limitMessage]);
-                    Storage.saveMessage(limitMessage);
+                    
+                    if (isGuest) {
+                        Storage.saveMessage(limitMessage);
+                    }
+                    
                     setIsTyping(false);
+
+                    // Add a custom property or just use the UI to render the button
+                    // Since Message content is StructuredAnswer, I'll add a check in MessageBubble or just use the ProactiveQuestion.
+                    // For now, let's keep it simple and just log that the limit was reached.
                     return;
                 }
                 throw new Error("Error en la respuesta del asistente");
@@ -342,6 +404,22 @@ export function ChatWindow({
         }
     };
 
+    const handleAction = async (actionType: string) => {
+        if (actionType === "upgrade_pro") {
+            try {
+                const res = await fetch("/api/billing/create-checkout", { method: "POST" });
+                if (res.ok) {
+                    const { url } = await res.json();
+                    window.location.href = url;
+                } else {
+                    console.error("Failed to create checkout session");
+                }
+            } catch (err) {
+                console.error("Error creating checkout session:", err);
+            }
+        }
+    };
+
     const effectiveUserAvatar = resolveEffectiveAvatar({
         avatarUrl: profile.avatarUrl,
         googleAvatarUrl: profile.googleAvatarUrl,
@@ -360,10 +438,10 @@ export function ChatWindow({
                         </div>
                         <div>
                              <h1 className="text-sm font-bold text-text-main">
-                                {profile.role === 'guest' ? `Invitado (${profile.questionCount}/2)` : (profile.professionalProfile ? `${profile.professionalProfile} MyFiscal` : 'Consulta Fiscal MyFiscal')}
+                                {profile.role === 'guest' ? `Invitado (${profile.questionCount}/5)` : (user?.name || 'Consulta Fiscal')}
                             </h1>
                             <p className="text-[10px] text-text-sec uppercase tracking-widest opacity-60">
-                                {profile.role === 'guest' ? 'Límite de Prueba' : (profile.professionalProfile ? 'Análisis Especializado' : 'Motor de análisis v1.0')}
+                                {profile.role === 'guest' ? 'Límite de Prueba (5 cons.)' : (profile.professionalProfile ? 'Análisis Especializado' : 'Motor de análisis v1.0')}
                             </p>
                         </div>
                     </div>
@@ -459,6 +537,7 @@ export function ChatWindow({
                                         sources={m.sources}
                                         onOpenArticle={handleOpenArticle}
                                         onRegenerate={handleRegenerate}
+                                        onAction={handleAction}
                                         userAvatarUrl={effectiveUserAvatar}
                                         assistantAvatarUrl="/icono.png"
                                     />

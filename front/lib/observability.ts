@@ -14,12 +14,18 @@ export interface UsageMetric {
 
 export async function logUsage(metric: UsageMetric) {
     try {
+        // Validate if userId is a valid UUID before inserting
+        const isUuid = (id?: string) => 
+            id ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) : false;
+
+        const safeUserId = isUuid(metric.userId) ? metric.userId : null;
+
         await query(
             `INSERT INTO usage_logs 
             (user_id, conversation_id, prompt_tokens, completion_tokens, model_version, execution_time_ms, status, error_message, ip_address)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
             [
-                metric.userId || null,
+                safeUserId,
                 metric.conversationId,
                 metric.promptTokens,
                 metric.completionTokens,

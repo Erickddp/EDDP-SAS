@@ -1,6 +1,5 @@
 import { SourceReference } from "./types";
 import { ParsedLegalReference } from "./law-alias";
-import { buildContextFromNormalized } from "./normalized-retrieval";
 import { buildPostgresContext } from "./pg-retrieval";
 
 export interface RetrievalContext {
@@ -17,7 +16,7 @@ export interface RetrievalContext {
 
 /**
  * Construye el contexto legal completo para una consulta.
- * Intenta primero PostgreSQL y cae a JSON normalizado si falla o no hay resultados.
+ * Utiliza PostgreSQL exclusivamente como motor de búsqueda.
  */
 export async function buildLegalContext(
     query: string,
@@ -30,8 +29,7 @@ export async function buildLegalContext(
     try {
         console.log(`🔍 [ContextBuilder] Iniciando recuperación para: "${query}"`);
         
-        // 1. Intentar recuperación desde PostgreSQL (Fase 2/3)
-        // Aumentamos ligeramente el límite interno para tener margen de filtrado post-recuperación
+        // 1. Recuperación desde PostgreSQL (Fase 2/3 SaaS)
         const pgContext = await buildPostgresContext(query, limit + 2, parsedRef);
         
         if (pgContext.retrievedArticles && pgContext.retrievedArticles.length > 0) {
@@ -45,28 +43,37 @@ export async function buildLegalContext(
         }
         
         console.warn(`⚠️ [ContextBuilder] PostgreSQL conectado pero sin resultados relevantes para la consulta.`);
+        
+        // Retornar contexto vacío si no hay resultados
+        return {
+            topic: pgContext.topic || "general",
+            retrievedArticles: [],
+            foundation: [],
+            sources: [],
+            retrievalMeta: {
+                strategy: "postgres-empty",
+                totalMatches: 0
+            },
+            fallbackUsed: false
+        };
+
     } catch (error: any) {
-        console.error("❌ [ContextBuilder] Fallo crítico en PostgreSQL retrieval:", {
+        console.error("❌ [ContextBuilder] Fallo en PostgreSQL retrieval:", {
             message: error.message,
             stack: error.stack?.split('\n')[0]
         });
-        // Si hay un error de conexión (ej. DATABASE_URL inválida), caemos al fallback de JSON
+        
+        // En caso de error severo devolvemos array vacío para evitar romper el hilo de la LLM
+        return {
+            topic: "general",
+            retrievedArticles: [],
+            foundation: [],
+            sources: [],
+            retrievalMeta: {
+                strategy: "postgres-error",
+                totalMatches: 0
+            },
+            fallbackUsed: false
+        };
     }
-
-    // 2. Fallback explícito a JSON normalizado (In-Memory)
-    const fallbackStart = Date.now();
-    console.log("🔄 [ContextBuilder] Usando fallback a JSON normalizado (Léxico)...");
-    const fallbackContext = await buildContextFromNormalized(query, limit, parsedRef, excludeIds, preferredLaw);
-    const fallbackDuration = Date.now() - fallbackStart;
-    
-    console.log(`ℹ️ [ContextBuilder] Fallback JSON completado con ${fallbackContext.retrievedArticles.length} resultados en ${fallbackDuration}ms.`);
-    
-    return {
-        ...fallbackContext,
-        fallbackUsed: true,
-        retrievalMeta: {
-            ...fallbackContext.retrievalMeta,
-            strategy: `${fallbackContext.retrievalMeta.strategy} (fallback-json)`
-        }
-    };
 }

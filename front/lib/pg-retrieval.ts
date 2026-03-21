@@ -84,44 +84,8 @@ export async function searchPostgresArticles(
             }));
         }
 
-        // 3. Fallback Híbrido a 'legal_documents' (Esquema anterior/deprecado)
-        console.log(`📡 [PG-Retrieval] No hay resultados en 'articles', intentando fallback a 'legal_documents'...`);
-        const sqlHybridFallback = `
-            SELECT 
-                l.id::text, l.document_name, l.abbreviation, l.article_number, l.title, l.content,
-                (CASE WHEN l.abbreviation = $2::text AND l.article_number = $3::text THEN 150 ELSE 0 END) +
-                (CASE WHEN $4::vector IS NOT NULL THEN (1 - (l.embedding <=> $4::vector)) * 30 ELSE 0 END)
-                AS combined_score
-            FROM legal_documents l
-            WHERE (l.abbreviation = $2::text AND l.article_number = $3::text)
-               OR ($4::vector IS NOT NULL AND (1 - (l.embedding <=> $4::vector)) > 0.35)
-            ORDER BY combined_score DESC
-            LIMIT $1::int
-        `;
-
-        const { rows: hybridRows } = await query(sqlHybridFallback, [
-            limit, 
-            targetAbbrev, 
-            targetArticle, 
-            queryVectorString
-        ]);
-
-        if (hybridRows.length > 0) {
-            console.log(`📡 [PG-Retrieval] ${hybridRows.length} resultados híbridos en 'legal_documents'.`);
-            return hybridRows.map(r => ({
-                id: r.id,
-                documentId: r.abbreviation?.toLowerCase() || "legal",
-                documentName: r.document_name,
-                documentAbbreviation: r.abbreviation,
-                articleNumber: r.article_number,
-                title: r.title || undefined,
-                text: r.content,
-                keywords: [],
-                source: "",
-                fragments: []
-            }));
-        }
-
+        // Si no hay resultados primarios, retornamos vacío (deprecated fallback eliminado)
+        console.log(`📡 [PG-Retrieval] No hay resultados de artículos en la consulta.`);
         return [];
     } catch (error) {
         console.error("❌ [PG-Retrieval] Error Híbrido:", error);

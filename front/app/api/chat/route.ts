@@ -14,12 +14,13 @@ import { buildRetrievalPlan } from "@/lib/retrieval-optimizer";
 import { filterArticlesByRelevance } from "@/lib/article-relevance";
 import { extractArticleFragments } from "@/lib/article-fragment";
 import { rankLegalAuthority, RankedArticle } from "@/lib/legal-authority-ranker";
-import { PlanType } from "@/lib/saas-constants";
+import { PlanType, GUEST_LIMIT } from "@/lib/saas-constants";
 
 import { getSubscriptionByUserId } from "@/lib/user-storage";
 import { checkUsageLimit, incrementUsage } from "@/lib/usage-enforcer";
 import { logUsage } from "@/lib/observability";
 import { handleApiError, AppErrorType, validatedMethod } from "@/lib/error-handler";
+import { saveConversation, saveMessage as saveChatMsg } from "@/lib/chat-storage";
 
 export async function POST(req: Request) {
     const methodError = validatedMethod(req, ["POST"]);
@@ -47,8 +48,8 @@ export async function POST(req: Request) {
         // ──────────────────────────────────────────────────────────────────
         // SaaS: Usage Limit Check (Real-time from DB)
         // ──────────────────────────────────────────────────────────────────
-        userId = session?.id || "anonymous-guest-" + (req.headers.get("x-forwarded-for") || "local");
         isGuest = !session || session.role === "guest";
+        userId = isGuest ? ("anonymous-guest-" + (req.headers.get("x-forwarded-for") || "local")) : (session?.id || "unknown");
         
         if (!isGuest && session?.id) {
             const subscription = await getSubscriptionByUserId(session.id);
@@ -66,21 +67,22 @@ export async function POST(req: Request) {
         if (!allowed) {
             return NextResponse.json({ 
                 error: "Límite de consultas alcanzado", 
+                code: isGuest ? "GUEST_LIMIT_REACHED" : "USAGE_LIMIT_EXCEEDED",
                 details: isGuest 
-                    ? "Has agotado tus consultas como invitado. Regístrate gratis para obtener más." 
-                    : `Has usado todas tus consultas para tu plan ${plan}. Por favor, actualiza tu plan para continuar.`,
+                    ? `Has agotado tus ${GUEST_LIMIT} consultas como invitado. Regístrate gratis para obtener más.` 
+                    : `Has usado todas tus consultas (${total}) para tu plan ${plan}. Por favor, actualiza tu plan para continuar.`,
                 limitReached: true,
                 total,
                 remaining
             }, { status: 402 });
         }
 
-        // 0. Get User Session (Phase 8: Guard - Combined)
-        if (session?.role === 'guest' && (session.questionCount || 0) >= 2) {
+        // Phase 8: Legacy Guard Sync (using the same logic now)
+        if (isGuest && (session?.questionCount || 0) >= GUEST_LIMIT) {
             return NextResponse.json({ 
                 error: "Límite de prueba alcanzado", 
                 code: "GUEST_LIMIT_REACHED",
-                message: "Has alcanzado el límite de 2 consultas como invitado. Regístrate o usa Google para continuar." 
+                message: `Has alcanzado el límite de ${GUEST_LIMIT} consultas como invitado. Regístrate o usa Google para continuar.` 
             }, { status: 403 });
         }
 
@@ -380,15 +382,6 @@ export async function POST(req: Request) {
             body.message
         );
 
-        // 6.5. Increment Guest Counter (Phase 8)
-        if (session?.role === 'guest') {
-            const currentCount = session.questionCount || 0;
-            await updateSessionData({ 
-                questionCount: currentCount + 1 
-            });
-            console.log(`│ Guest Limit: ${currentCount + 1}/2 questions used`);
-        }
-
         // ─── Build debug metadata ────────────────────────────────────────
         const debugMeta: AdaptiveDebugMeta = {
             queryDebug,
@@ -460,13 +453,54 @@ export async function POST(req: Request) {
         await logUsage({
             userId: userId,
             conversationId: body.conversationId,
-            promptTokens: 0, // In future, extract actual tokens from LLM response
+            promptTokens: 0, 
             completionTokens: 0,
             model: OPENAI_MODEL || "mock",
             durationMs: Date.now() - startTime,
             status: "success",
             ipAddress: req.headers.get("x-forwarded-for") || "local"
         });
+
+        // 6.5. Final Side Effects (Guest limit or DB Persistence)
+        if (isGuest) {
+            const currentCount = session?.questionCount || 0;
+            await updateSessionData({ 
+                questionCount: currentCount + 1 
+            });
+            console.log(`│ Guest Limit: ${currentCount + 1}/${GUEST_LIMIT} questions used`);
+        } else if (userId !== "unknown") {
+            try {
+                await saveConversation(userId, {
+                    id: body.conversationId,
+                    title: (body.history?.length === 0 && titleSuggestion) ? (titleSuggestion as string) : "Consulta Fiscal",
+                    mode: body.mode,
+                    detailLevel: body.detailLevel,
+                    archived: false,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now()
+                });
+
+                await saveChatMsg({
+                    id: `user-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                    conversationId: body.conversationId,
+                    role: "user",
+                    content: body.message,
+                    createdAt: Date.now()
+                });
+
+                await saveChatMsg({
+                    id: `asst-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                    conversationId: body.conversationId,
+                    role: "assistant",
+                    content: chatResponse.answer,
+                    sources: chatResponse.sources,
+                    createdAt: Date.now()
+                });
+                console.log(`│ DB Storage: Persistent History updated.`);
+            } catch (dbErr) {
+                console.error("│ DB Storage Error:", dbErr);
+            }
+        }
 
         return NextResponse.json(finalResponse);
     } catch (error: unknown) {

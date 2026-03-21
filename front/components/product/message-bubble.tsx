@@ -30,6 +30,7 @@ interface MessageBubbleProps {
     sources?: SourceReference[];
     onOpenArticle?: (article: LawArticlePayload) => void;
     onRegenerate?: () => void;
+    onAction?: (actionType: string) => void;
     userAvatarUrl?: string;
     assistantAvatarUrl?: string;
 }
@@ -96,6 +97,7 @@ export function MessageBubble({
     sources,
     onOpenArticle,
     onRegenerate,
+    onAction,
     userAvatarUrl = "/avatars/avatar-ocean.svg",
     assistantAvatarUrl = "/icono.png"
 }: MessageBubbleProps) {
@@ -135,9 +137,8 @@ export function MessageBubble({
                         alt={isUser ? "Usuario" : "MyFiscal"}
                         className={cn("h-full w-full object-contain transition-opacity duration-300", !isUser && "p-0.5")}
                         loading="lazy"
-                        onError={(event: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                            const target = event.currentTarget;
-                            target.style.opacity = "0";
+                        onError={(event) => {
+                            (event.currentTarget as HTMLImageElement).style.opacity = "0";
                         }}
                     />
                 </div>
@@ -162,6 +163,7 @@ export function MessageBubble({
                                 sources={sources}
                                 onOpenArticle={onOpenArticle}
                                 onRegenerate={onRegenerate}
+                                onAction={onAction}
                             />
                         )}
                     </div>
@@ -175,16 +177,17 @@ function StructuredResponseView({
     answer,
     sources,
     onOpenArticle,
-    onRegenerate
+    onRegenerate,
+    onAction
 }: {
     answer: StructuredAnswer;
     sources?: SourceReference[];
     onOpenArticle?: (article: LawArticlePayload) => void;
     onRegenerate?: () => void;
+    onAction?: (actionType: string) => void;
 }) {
     const data = normalizeStructured(answer);
-    const isComplex = !!data.legalInterpretation || data.relatedArticles.length > 0;
-
+    
     // Detect intent from field presence
     const isMulta = !!data.montoMinimo || !!data.montoMaximo || data.factoresAgravantes.length > 0;
     const isCalculo = data.pasos.length > 0 || !!data.formula;
@@ -406,22 +409,64 @@ function StructuredResponseView({
 
             {/* 6. PRÓXIMO PASO */}
             {data.proactiveQuestion && (
-                <div className="pt-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                    <div className="flex items-center gap-3 bg-bg-main/40 border border-border-glow/40 rounded-2xl p-4 group hover:border-cyan-main/30 transition-all cursor-default">
-                        <div className="bg-cyan-main/10 p-2 rounded-xl group-hover:bg-cyan-main/20 transition-colors">
-                            <MessageCircle size={18} className="text-cyan-main" />
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-text-sec uppercase tracking-[0.1em] opacity-60">Sugerencia inteligente</p>
-                            <p className="text-sm text-text-main/90 font-medium italic group-hover:text-cyan-main/90 transition-colors">
-                                ¿{data.proactiveQuestion.startsWith("¿") ? data.proactiveQuestion.substring(1) : data.proactiveQuestion}?
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                <ActionableQuestion 
+                    question={data.proactiveQuestion} 
+                    onAction={onAction} 
+                />
             )}
 
             <MessageActions content={answer} onRegenerate={onRegenerate} />
+        </div>
+    );
+}
+
+// ─── Actionable Question Component ──────────────────────────────────────────
+
+function ActionableQuestion({ 
+    question, 
+    onAction 
+}: { 
+    question: string; 
+    onAction?: (type: string) => void;
+}) {
+    const isProUpgrade = question.toLowerCase().includes("pro") || question.toLowerCase().includes("suscribirte");
+    
+    return (
+        <div className="pt-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <div className={cn(
+                "flex flex-col sm:flex-row items-start sm:items-center gap-4 border rounded-2xl p-4 transition-all",
+                isProUpgrade 
+                    ? "bg-cyan-main/5 border-cyan-main/30 shadow-[0_0_20px_rgba(32,196,255,0.05)]" 
+                    : "bg-bg-main/40 border-border-glow/40 group hover:border-cyan-main/30"
+            )}>
+                <div className="flex items-center gap-3 flex-1">
+                    <div className={cn(
+                        "p-2 rounded-xl transition-colors",
+                        isProUpgrade ? "bg-cyan-main/20" : "bg-cyan-main/10 group-hover:bg-cyan-main/20"
+                    )}>
+                        <MessageCircle size={18} className="text-cyan-main" />
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-[10px] font-black text-text-sec uppercase tracking-[0.1em] opacity-60">Sugerencia inteligente</p>
+                        <p className={cn(
+                            "text-sm font-medium italic transition-colors",
+                            isProUpgrade ? "text-cyan-main" : "text-text-main/90 group-hover:text-cyan-main/90"
+                        )}>
+                            ¿{question.startsWith("¿") ? question.substring(1) : question}?
+                        </p>
+                    </div>
+                </div>
+                
+                {isProUpgrade && (
+                    <button 
+                        onClick={() => onAction?.("upgrade_pro")}
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-cyan-main hover:bg-cyan-glow text-bg-main px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-cyan-main/20 active:scale-95"
+                    >
+                        <Sparkles size={14} />
+                        Actualizar a Pro
+                    </button>
+                )}
+            </div>
         </div>
     );
 }

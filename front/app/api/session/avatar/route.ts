@@ -38,6 +38,9 @@ export async function GET(request: NextRequest) {
       effectiveAvatarUrl,
       options: USER_AVATAR_OPTIONS,
       lockedByGoogle: Boolean(session.googleAvatarUrl),
+      role: session.role,
+      questionCount: session.questionCount ?? 0,
+      professionalProfile: session.professionalProfile ?? null,
     });
     applySessionCookie(response, token);
     return response;
@@ -51,6 +54,7 @@ export async function GET(request: NextRequest) {
     lockedByGoogle: Boolean(session.googleAvatarUrl),
     role: session.role,
     questionCount: session.questionCount ?? 0,
+    professionalProfile: session.professionalProfile ?? null,
   });
 }
 
@@ -83,6 +87,9 @@ export async function POST(request: NextRequest) {
     googleAvatarUrl: session.googleAvatarUrl ?? null,
     effectiveAvatarUrl,
     lockedByGoogle: Boolean(session.googleAvatarUrl),
+    role: session.role,
+    questionCount: session.questionCount ?? 0,
+    professionalProfile: session.professionalProfile ?? null,
   });
 
   applySessionCookie(response, token);

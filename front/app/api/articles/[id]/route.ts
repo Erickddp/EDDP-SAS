@@ -2,7 +2,32 @@ import { NextResponse } from "next/server";
 
 import { query } from "@/lib/db";
 import { LawArticlePayload } from "@/lib/types";
-import { getNormalizedArticlePayloadBySourceId, getOfficialPdfUrl } from "@/lib/normalized-retrieval";
+
+const DEFAULT_SOURCE_URL = "https://www.diputados.gob.mx/LeyesBiblio/";
+const OFFICIAL_PDF_BY_ABBR: Record<string, string> = {
+    CPEUM: "https://www.diputados.gob.mx/LeyesBiblio/pdf/CPEUM.pdf",
+    LISR: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LISR.pdf",
+    LIVA: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LIVA.pdf",
+    CFF: "https://www.diputados.gob.mx/LeyesBiblio/pdf/CFF.pdf",
+    CCOM: "https://www.diputados.gob.mx/LeyesBiblio/pdf/CCom.pdf",
+    LOPDC: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LOPDC.pdf",
+    LFT: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LFT.pdf",
+    LSS: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LSS.pdf",
+    CCF: "https://www.diputados.gob.mx/LeyesBiblio/pdf/CCF.pdf",
+    LGSM: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LGSM.pdf",
+    LA: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LAdua.pdf",
+    LFPCA: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPCA.pdf",
+    LFPA: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPA.pdf",
+    LFEA: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LFEA.pdf",
+    LIEPS: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LIEPS.pdf",
+    LINFONAVIT: "https://www.diputados.gob.mx/LeyesBiblio/pdf/LIFNVT.pdf"
+};
+
+export function getOfficialPdfUrl(abbreviation: string | undefined, fallback?: string): string {
+    if (fallback && fallback.startsWith("http")) return fallback;
+    if (!abbreviation) return DEFAULT_SOURCE_URL;
+    return OFFICIAL_PDF_BY_ABBR[abbreviation.toUpperCase()] || DEFAULT_SOURCE_URL;
+}
 
 type DbArticleRow = {
     id: string;
@@ -78,33 +103,6 @@ async function findArticleInDb(id: string): Promise<LawArticlePayload | null> {
         console.warn("Article lookup on primary articles table failed:", error);
     }
 
-    // 2. Fallback para tabla 'legal_documents' si existe (esquema alternativo detectable)
-    try {
-        const { rows } = await query<DbArticleRow>(
-            `SELECT
-                l.id::text AS id,
-                lower(l.abbreviation) AS document_id,
-                l.document_name,
-                l.abbreviation,
-                l.article_number,
-                l.title,
-                l.content AS text,
-                NULL::text AS source,
-                NULL::text AS status,
-                l.sections
-             FROM legal_documents l
-             WHERE l.id::text = $1
-             LIMIT 1`,
-            [id]
-        );
-
-        if (rows.length > 0) {
-            return mapDbRowToPayload(rows[0]);
-        }
-    } catch (error) {
-        // Silencioso si falla la tabla alternativa
-    }
-
     return null;
 }
 
@@ -122,12 +120,7 @@ export async function GET(
             return NextResponse.json({ article: dbArticle });
         }
 
-        // 2. Fallback a fuente normalizada (JSON en memoria)
-        const normalizedArticle = getNormalizedArticlePayloadBySourceId(decodedId);
-        if (normalizedArticle) {
-            return NextResponse.json({ article: normalizedArticle });
-        }
-
+        // Ya no hay fallback a sistema de archivos JSON. Si no está en BD, no existe.
         return NextResponse.json(
             { error: `Articulo con ID ${decodedId} no encontrado` },
             { status: 404 }
