@@ -70,19 +70,19 @@ export function Hero({ user, forceGuestView = false, hasSession = false }: HeroP
                         </Link>
                     ) : (
                         <>
-                            {hasSession ? (
-                                <Link href="/chat">
-                                    <Button size="lg" variant="primary" className="w-full sm:w-auto text-base px-8">
-                                        Probar ahora
-                                    </Button>
-                                </Link>
-                            ) : (
-                                <form action={guestLogin}>
-                                    <Button size="lg" variant="primary" type="submit" className="w-full sm:w-auto text-base px-8">
-                                        Probar ahora
-                                    </Button>
-                                </form>
-                            )}
+                        {hasSession ? (
+                            <Link href="/chat">
+                                <Button size="lg" variant="primary" className="w-full sm:w-auto text-base px-8">
+                                    Probar ahora
+                                </Button>
+                            </Link>
+                        ) : (
+                            <form action={guestLogin}>
+                                <Button size="lg" variant="primary" type="submit" className="w-full sm:w-auto text-base px-8">
+                                    Probar ahora
+                                </Button>
+                            </form>
+                        )}
                             <Link href="/register">
                                 <Button size="lg" variant="secondary" className="w-full sm:w-auto text-base px-8">
                                     Crear cuenta

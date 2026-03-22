@@ -111,8 +111,27 @@ export async function register(prevState: any, formData: FormData) {
 }
 
 export async function googleLogin() {
-    console.log("Google Auth requested - Redirecting to chat (Mock)");
-    redirect("/chat");
+    const googleAuthUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    
+    const client_id = process.env.GOOGLE_CLIENT_ID;
+    const base_url = process.env.NEXT_PUBLIC_BASE_URL;
+    
+    if (!client_id || !base_url) {
+        console.error("Missing Google Auth Env Vars:", { client_id: !!client_id, base_url: !!base_url });
+        redirect("/login?error=Configuración de autenticación incompleta");
+    }
+
+    const redirect_uri = `${base_url}/api/auth/google/callback`;
+    
+    googleAuthUrl.searchParams.set("client_id", client_id);
+    googleAuthUrl.searchParams.set("redirect_uri", redirect_uri);
+    googleAuthUrl.searchParams.set("response_type", "code");
+    googleAuthUrl.searchParams.set("scope", "openid email profile");
+    googleAuthUrl.searchParams.set("access_type", "offline");
+    googleAuthUrl.searchParams.set("prompt", "consent");
+    
+    console.log(`[AUTH] Redirecting to Google OAuth: ${redirect_uri}`);
+    redirect(googleAuthUrl.toString());
 }
 
 export async function guestLogin() {
