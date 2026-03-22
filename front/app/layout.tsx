@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -18,6 +18,9 @@ export const metadata: Metadata = {
     icon: "/logo.png",
     shortcut: "/logo.png",
     apple: "/logo.png",
+  },
+  verification: {
+    google: "8f4kSzQu3s1hQEO2C_eXFqX0EJiCQ4nZtod0AyZbw3o",
   },
 };
 
