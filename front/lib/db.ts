@@ -1,32 +1,33 @@
 import { Pool, QueryResult, QueryResultRow } from 'pg';
-import dotenv from "dotenv";
-import path from "path";
 
-// Support standard loading for scripts
-dotenv.config(); // search current dir
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
-dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+/**
+ * PRODUCTION DATABASE CONNECTION LAYER
+ * Resolves ENOTFOUND issues by strictly using the native DATABASE_URL from Vercel/Environment.
+ * Direct connection without manual URL building or HTTP malformed prefixes.
+ */
 
-const connectionString = process.env.DATABASE_URL;
+const dbUrl = process.env.DATABASE_URL;
 
-if (!connectionString) {
-  console.warn('⚠️  DATABASE_URL not found (process.env.DATABASE_URL). Current CWD:', process.cwd());
+if (!dbUrl && process.env.NODE_ENV === 'production') {
+  console.error('❌ FATAL: DATABASE_URL is missing in Production environment.');
 }
 
-
 const pool = new Pool({
-  connectionString,
+  connectionString: dbUrl,
   ssl: {
     rejectUnauthorized: false
   },
-  // Serverless optimization for Vercel + Supabase Pooler (6543)
-  max: 3, 
+  // Vercel Serverless Optimization (Reduced pool size for concurrency handling)
+  max: 4, 
   min: 0,
-  idleTimeoutMillis: 10000,
+  idleTimeoutMillis: 15000,
   connectionTimeoutMillis: 5000,
+  allowExitOnIdle: true,
 });
 
+/**
+ * Standard query wrapper for type safety and unified error logging.
+ */
 export async function query<T extends QueryResultRow = any>(
   text: string,
   params?: any[]
@@ -34,17 +35,27 @@ export async function query<T extends QueryResultRow = any>(
   const start = Date.now();
   try {
     const res = await pool.query<T>(text, params);
+    const duration = Date.now() - start;
+    
+    if (process.env.NODE_ENV !== 'production' && duration > 500) {
+      console.warn(`🐢 Slow Query (${duration}ms):`, text.substring(0, 100));
+    }
+    
     return res;
   } catch (error: any) {
-    console.error('❌ Database Query Error:', {
+    console.error('❌ Database Query Failure:', {
       message: error.message,
       code: error.code,
+      host: dbUrl ? new URL(dbUrl).hostname : 'undefined',
       detail: error.detail,
     });
     throw error;
   }
 }
 
+/**
+ * Get a client from the pool for transactions.
+ */
 export async function getClient() {
   const client = await pool.connect();
   return client;
