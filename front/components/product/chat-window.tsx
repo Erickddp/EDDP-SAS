@@ -551,13 +551,24 @@ export function ChatWindow({
                                 exit={{ opacity: 0, y: -20 }}
                                 className="flex flex-col items-center justify-center pt-10 md:pt-20 pb-24"
                             >
-                                <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-[2rem] bg-white dark:bg-bg-sec border border-border-glow shadow-[0_20px_40px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.3)] relative overflow-hidden group p-4">
-                                    <div className="absolute inset-0 bg-cyan-main/5 blur-2xl group-hover:bg-cyan-main/10 transition-colors" />
-                                    <img src="/icono.png" alt="MyFiscal" className="w-full h-full object-contain relative z-10 transition-transform group-hover:scale-110" />
+                                <div className="mb-8 flex h-28 w-28 items-center justify-center rounded-[2.5rem] bg-white dark:bg-bg-sec border border-border-glow shadow-[0_20px_40px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.3)] relative overflow-hidden group p-1 ring-4 ring-cyan-main/20">
+                                    <div className="absolute inset-0 bg-cyan-main/10 blur-2xl group-hover:bg-cyan-main/20 transition-colors" />
+                                    <img 
+                                        src={effectiveUserAvatar} 
+                                        alt="Avatar de perfil" 
+                                        className="w-full h-full object-cover rounded-[2.2rem] relative z-10 transition-transform group-hover:scale-105" 
+                                    />
                                 </div>
-                                <h2 className="mb-3 text-3xl font-extrabold text-text-main text-center tracking-tight">¿Cómo puedo orientarte hoy?</h2>
+                                <h2 className="mb-3 text-3xl font-extrabold text-text-main text-center tracking-tight">
+                                    ¡Hola, {user?.name ? user.name.split(' ')[0] : (profile.role === 'guest' ? 'Invitado' : 'Usuario')}! ¿En qué te puedo ayudar hoy?
+                                </h2>
                                 <p className="text-text-sec text-base text-center mb-10 max-w-lg leading-relaxed">
-                                    Haz una consulta sobre IVA, RESICO, declaraciones o multas. Esta demo te mostrará el rigor analítico de MyFiscal.
+                                    {profile.professionalProfile ? (
+                                        <>Como <strong className="text-cyan-main font-semibold capitalize">{profile.professionalProfile}</strong>, tus consultas fiscales se analizan con un rigor técnico adaptado a tu experiencia. </>
+                                    ) : (
+                                        <>Completa tu perfil profesional para recibir respuestas fiscales adaptadas a tu nivel de experiencia. </>
+                                    )}
+                                    Haz una consulta sobre IVA, RESICO, declaraciones o multas.
                                 </p>
                                 <PromptSuggestions onSelect={(p) => {
                                     if (!conversationId) onNewConversation();
