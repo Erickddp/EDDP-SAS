@@ -56,7 +56,7 @@ export default function AccountPage() {
         setCheckoutLoading(true);
         console.log("[Account] Initiating checkout for PRO plan");
         try {
-            const res = await fetch("/api/billing/checkout", {
+            const res = await fetch("/api/billing/create-checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ plan: "pro" }),

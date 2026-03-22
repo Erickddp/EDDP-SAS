@@ -9,7 +9,10 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Debes estar registrado para suscribirte" }, { status: 401 });
         }
 
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+        if (!baseUrl) {
+            throw new Error("NEXT_PUBLIC_BASE_URL is not defined in environment variables");
+        }
 
         // Create Checkout Session
         const checkoutSession = await stripe.checkout.sessions.create({

@@ -28,9 +28,13 @@
     "migrate:saas": "npx tsx scripts/migrate-saas.ts"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.47",
+    "ai": "^6.0.134",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
-    "framer-motion": "^12.35.2",
+    "crypto": "^1.0.1",
+    "framer-motion": "^12.38.0",
+    "ioredis": "^5.10.1",
     "jose": "^6.2.1",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
@@ -40,7 +44,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "stripe": "^20.4.1",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

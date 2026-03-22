@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+export const maxDuration = 60; // Vercel: allow up to 60s for RAG streaming
 import { MockEngine } from "@/lib/mock-engine";
 import { ChatRequest, ChatResponse, StructuredAnswer, AdaptiveDebugMeta, CitationEntry, FoundationEntry } from "@/lib/types";
 import { tokenizeQuery } from "@/lib/legal-search";
@@ -15,15 +17,24 @@ import { filterArticlesByRelevance } from "@/lib/article-relevance";
 import { extractArticleFragments } from "@/lib/article-fragment";
 import { rankLegalAuthority, RankedArticle } from "@/lib/legal-authority-ranker";
 import { PlanType, GUEST_LIMIT, PLAN_LIMITS } from "@/lib/saas-constants";
+import { streamText } from "ai";
+import { openaiModel } from "@/lib/openai";
+
 
 
 import { getSubscriptionByUserId, getUserById } from "@/lib/user-storage";
-
 import { checkUsageLimit, incrementUsage } from "@/lib/usage-enforcer";
 import { logUsage } from "@/lib/observability";
 import { handleApiError, AppErrorType, validatedMethod } from "@/lib/error-handler";
 import { saveConversation, saveMessage as saveChatMsg } from "@/lib/chat-storage";
 import { performIterativeRetrieval } from "@/lib/retrieval/iterative-engine";
+import { getCachedResponse, setCachedResponse } from "@/lib/cache-manager";
+import { measureOperation } from "@/lib/telemetry";
+import { isRateLimited } from "@/lib/cache-manager";
+
+
+
+
 
 
 export async function POST(req: Request) {
@@ -31,23 +42,37 @@ export async function POST(req: Request) {
     if (methodError) return methodError;
 
     const startTime = Date.now();
+    const clientIp = req.headers.get("x-forwarded-for") || "local";
     let userId = "unknown";
+
     let plan = "gratis";
     let isGuest = true;
 
     try {
         const session = await getSession();
         let body: ChatRequest;
-        
         try {
             body = await req.json();
         } catch (e) {
             return handleApiError(new Error("Payload JSON inválido"), AppErrorType.VALIDATION);
         }
 
+
         if (!body.message || !body.conversationId) {
             return handleApiError(new Error("Mensaje u ID de conversación faltante"), AppErrorType.VALIDATION);
         }
+
+
+
+        // 0.1 Edge Rate Limiting (Phase 9B)
+        const isLimited = await isRateLimited(clientIp, 5, 60);
+        if (isLimited) {
+            return NextResponse.json({ 
+                error: "Demasiadas peticiones", 
+                message: "Has superado el límite de 5 consultas por minuto. Por favor, espera un momento." 
+            }, { status: 429 });
+        }
+
 
         // ──────────────────────────────────────────────────────────────────
         // SaaS: Usage Limit Check (Real-time from DB)
@@ -151,6 +176,22 @@ export async function POST(req: Request) {
                 effectiveQuery = `${lastUserMessage} | Seguimiento: ${body.message}`;
             }
         }
+
+        // 0.2. Semantic Cache Check (Phase 9A)
+        const userProfile = userContext?.professionalProfile || "entrepreneur";
+        const cached = await getCachedResponse(body.message, userProfile);
+        if (cached && !followUpResult.isFollowUp) {
+            const cacheResponse = {
+                ...cached,
+                _debug: {
+                    ...(cached._debug || {}),
+                    cacheHit: true,
+                    totalTimeMs: Date.now() - startTime
+                }
+            };
+            return NextResponse.json(cacheResponse);
+        }
+
 
         // 0.5. Extraer intención determinista de artículos / leyes 
         const parsedRef = parseLegalReference(effectiveQuery);
@@ -350,254 +391,143 @@ export async function POST(req: Request) {
             console.log(`│ Authority Ranking: primary=${ranking.primary?.article.id || "none"} supporting=${ranking.supporting.length} rejected=${ranking.rejected.length}`);
         }
 
-        // 3. Generar respuesta (OpenAI con fallback a MockEngine)
-        let answer: StructuredAnswer;
-        let mockResult = null;
-
         // Determinar estrategia exacta
         const hasExactMatch = !!parsedRef.lawAbbreviation && !!parsedRef.articleNumber && context.retrievedArticles.length > 0;
         const retrievalStrategy = hasExactMatch ? 'exact-law-article' : context.retrievalMeta.strategy;
         const finalRetrievalStrategy = effectiveRetrievalStrategy === "context-aware" ? "context-aware" : retrievalStrategy;
+        const titleSuggestion = "Consulta Fiscal"; // Fallback or logic to generate
 
-        if (openai) {
-            try {
-                const response = await openai.chat.completions.create({
-                    model: OPENAI_MODEL,
-                    messages: [
-                        {
-                            role: "system", content: buildSystemPrompt({
-                                message: body.message,
-                                mode: body.mode,
-                                detailLevel: body.detailLevel,
-                                topic: context.topic,
-                                legalContext: context.retrievedArticles,
-                                history: body.history,
-                                retrievalStrategy: finalRetrievalStrategy === "context-aware" ? retrievalStrategy : retrievalStrategy,
-                                parsedRef,
-                                queryAnalysis,
-                                isFollowUp: followUpResult.isFollowUp,
-                                previousTopic: previousContext?.lastTopic,
-                                userContext
-                            })
-                        },
-                        {
-                            role: "user", content: buildUserPrompt({
-                                message: body.message,
-                                mode: body.mode,
-                                detailLevel: body.detailLevel,
-                                topic: context.topic,
-                                legalContext: context.retrievedArticles,
-                                history: body.history,
-                                retrievalStrategy,
-                                parsedRef,
-                                queryAnalysis,
-                                isFollowUp: followUpResult.isFollowUp,
-                                previousTopic: previousContext?.lastTopic
-                            })
-                        }
-                    ],
-                    response_format: { type: "json_object" },
-                    temperature: 0.2,
-                    max_tokens: effectiveTokenLimit
-                });
-
-                const content = response.choices[0].message.content;
-                if (!content) throw new Error("Respuesta de OpenAI vacía");
-
-                answer = JSON.parse(content);
-            } catch (err) {
-                console.error("OpenAI Error:", err);
-                mockResult = await MockEngine.processChat(body, context.topic);
-                answer = mockResult.answer;
-            }
-        } else {
-            mockResult = await MockEngine.processChat(body, context.topic);
-            answer = mockResult.answer;
-        }
-
-        // 4. Integrar artículos en la respuesta estructurada
-        const sources = context.sources.length > 0 ? context.sources : (mockResult?.sources || []);
-
-        // 4.1. Citation Validation & Traceability
-        const retrievedArticleIds = new Set(context.retrievedArticles.map((a: any) => a.id));
-        const validCitations: CitationEntry[] = [];
-        let invalidCitationsRemoved = 0;
-
-        if (Array.isArray(answer.citations)) {
-            (answer.citations as CitationEntry[]).forEach((cit) => {
-                if (cit.sourceId && retrievedArticleIds.has(cit.sourceId)) {
-                    validCitations.push(cit);
-                } else {
-                    invalidCitationsRemoved++;
+        // ──────────────────────────────────────────────────────────────────
+        // 10. Final Stream Generation (Phase 10: Vercel AI SDK)
+        // ──────────────────────────────────────────────────────────────────
+        const result = streamText({
+            model: openaiModel(OPENAI_MODEL),
+            messages: [
+                {
+                    role: "system", 
+                    content: buildSystemPrompt({
+                        message: body.message,
+                        mode: body.mode,
+                        detailLevel: body.detailLevel,
+                        topic: context.topic,
+                        legalContext: context.retrievedArticles,
+                        history: body.history,
+                        retrievalStrategy: finalRetrievalStrategy,
+                        parsedRef,
+                        queryAnalysis,
+                        isFollowUp: followUpResult.isFollowUp,
+                        previousTopic: previousContext?.lastTopic,
+                        userContext
+                    })
+                },
+                {
+                    role: "user", 
+                    content: buildUserPrompt({
+                        message: body.message,
+                        mode: body.mode,
+                        detailLevel: body.detailLevel,
+                        topic: context.topic,
+                        legalContext: context.retrievedArticles,
+                        history: body.history,
+                        retrievalStrategy,
+                        parsedRef,
+                        queryAnalysis,
+                        isFollowUp: followUpResult.isFollowUp,
+                        previousTopic: previousContext?.lastTopic
+                    })
                 }
-            });
-        }
-        
-        answer.citations = validCitations;
-        
-        const primaryCitationsCount = validCitations.filter(c => c.type === "primary").length;
-        const supportingCitationsCount = validCitations.filter(c => c.type === "supporting").length;
-        
-        let traceabilityValidated = false;
-        if (Array.isArray(answer.summaryCitations) && answer.summaryCitations.length > 0) {
-            traceabilityValidated = answer.summaryCitations.some(ref => 
-                validCitations.some(c => c.ref === ref && c.type === "primary")
-            );
-        }
+            ],
+            temperature: 0.2,
+            onFinish: async (completion) => {
+                // Post-stream side effects
+                const finishTime = Date.now();
+                const duration = finishTime - startTime;
 
-        // 4.2 Legacy Foundation 
-        const modelFoundation = Array.isArray(answer.foundation) ? answer.foundation.filter(Boolean) : [];
-        const fallbackFoundationRaw = mockResult?.answer.foundation || context.foundation || [];
-        const foundation = modelFoundation.length > 0 ? modelFoundation : (fallbackFoundationRaw as (string | FoundationEntry)[]).map((item) => 
-            typeof item === "string" ? { type: "primary" as const, ref: item } : item
-        );
+                try {
+                    // Try to parse structured answer from completion if it's JSON
+                    let answer: StructuredAnswer;
+                    try {
+                        answer = JSON.parse(completion.text);
+                    } catch (e) {
+                         // Fallback for non-JSON streams or partial failures
+                         answer = {
+                            summary: completion.text,
+                            foundation: [],
+                            scenarios: [],
+                            consequences: [],
+                            certainty: "Análisis en vivo",
+                            disclaimer: "Respuesta en streaming."
+                         } as any;
+                    }
 
-        // 5. Sugerencia de título
-        const titleSuggestion = mockResult?.titleSuggestion || "Consulta Fiscal";
+                    // Update conversation memory
+                    updateConversationContext(
+                        body.conversationId,
+                        context.topic,
+                        queryAnalysis.detectedIntent,
+                        context.retrievedArticles.map((a: any) => `${a.documentAbbreviation} Art. ${a.articleNumber}`),
+                        context.retrievedArticles.map((a: any) => a.id),
+                        context.retrievedArticles[0]?.documentAbbreviation || "general",
+                        body.message
+                    );
 
-        // 6. Update conversation memory for next turn
-        updateConversationContext(
-            body.conversationId,
-            context.topic,
-            queryAnalysis.detectedIntent,
-            context.retrievedArticles.map((a: any) => `${a.documentAbbreviation} Art. ${a.articleNumber}`),
-            context.retrievedArticles.map((a: any) => a.id),
-            context.retrievedArticles[0]?.documentAbbreviation || "general",
-            body.message
-        );
+                    // SaaS: Usage Tracking
+                    if (!isGuest) await incrementUsage(userId);
+                    
+                    await logUsage({
+                        userId: userId,
+                        conversationId: body.conversationId,
+                        promptTokens: (completion.usage as any).promptTokens + iterativeTokens,
+                        completionTokens: (completion.usage as any).completionTokens,
+                        model: OPENAI_MODEL,
+                        durationMs: duration,
+                        status: "success",
+                        ipAddress: clientIp
+                    });
 
-        // ─── Build debug metadata ────────────────────────────────────────
-        const debugMeta: AdaptiveDebugMeta = {
-            queryDebug,
-            retrievalRequested: tierConfig.articles,
-            retrievalReturned: context.retrievedArticles.length,
-            topSources: context.sources.slice(0, 5).map((s: any) => s.title),
-            tokenLimit: effectiveTokenLimit,
-            promptComplexity: queryAnalysis.complexity,
-            promptMode: queryAnalysis.mode,
-            promptDetail: queryAnalysis.detail,
-            detectedIntent: queryAnalysis.detectedIntent,
-            followUpDetected: followUpResult.isFollowUp,
-            followUpReason: followUpResult.reason,
-            reusedTopic: followUpResult.isFollowUp ? (previousContext?.lastTopic || null) : null,
-            depthRulesApplied: true,
-            targetMinWords: depthRule.minWords,
-            targetMaxWords: depthRule.maxWords,
-            followUpCompressionApplied: followUpResult.isFollowUp,
-            compressedTokenLimit: followUpResult.isFollowUp ? effectiveTokenLimit : null,
-            compressedWordLimit: followUpResult.isFollowUp ? depthRule.maxWords : null,
-            retrievedArticlesCount: context.retrievedArticles.length,
-            retrievalStrategy: finalRetrievalStrategy,
-            articleDiversityApplied: retrievalPlan.diversityApplied,
-            previousArticlesExcluded: retrievalPlan.previousArticlesExcluded,
-            responseSections: Object.keys(answer),
-            summaryLength: answer.summary ? answer.summary.split(/\s+/).length : 0,
-            foundationCount: Array.isArray(foundation) ? foundation.length : 0,
-            exampleIncluded: !!answer.example,
-            citationsCount: validCitations.length,
-            primaryCitationsCount,
-            supportingCitationsCount,
-            traceabilityValidated,
-            invalidCitationsRemoved,
-            // Phase 7B
-            authorityRankingApplied: true,
-            primaryBasisRef: ranking.primary?.article.id,
-            primaryBasisLaw: ranking.primary?.article.documentAbbreviation,
-            primaryBasisWhy: ranking.primary?.reasons[0],
-            supportingBasisRefs: ranking.supporting?.map((s) => s.article.id),
-            supportingBasisLaws: ranking.supporting?.map((s) => s.article.documentAbbreviation),
-            rejectedBasisRefs: ranking.rejected?.map((s) => s.article.id),
-            mainPriorityApplied: true,
-            subsectionPrecisionApplied: true
-        };
+                    // Database Persistence
+                    if (userId !== "unknown") {
+                        await saveConversation(userId, {
+                            id: body.conversationId,
+                            title: (body.history?.length === 0) ? (titleSuggestion as string) : "Consulta Fiscal",
+                            mode: body.mode,
+                            detailLevel: body.detailLevel,
+                            archived: false,
+                            createdAt: Date.now(),
+                            updatedAt: Date.now()
+                        });
 
-        const chatResponse: ChatResponse = {
-            answer: {
-                ...answer,
-                foundation,
-                certainty: answer.certainty || (context.retrievedArticles.length > 0 ? `Basado en ${context.retrievedArticles.length} artículo(s)` : "Referencia normativa"),
-                disclaimer: answer.disclaimer || "Esta respuesta se basa en análisis automatizado de artículos fiscales."
-            },
-            sources: context.sources,
-            titleSuggestion,
-            queryAnalysis,
-            _debug: {
-                ...debugMeta,
-                wasIterative,
-                passCount,
-                iterativeTokens,
-                iterationTasks
+                        await saveChatMsg({
+                            id: `user-${Date.now()}`,
+                            conversationId: body.conversationId,
+                            role: "user",
+                            content: body.message,
+                            createdAt: Date.now()
+                        });
+
+                        await saveChatMsg({
+                            id: `asst-${Date.now()}`,
+                            conversationId: body.conversationId,
+                            role: "assistant",
+                            content: answer,
+                            sources: context.sources,
+                            createdAt: Date.now()
+                        });
+                    }
+
+                    // Cache (non-follow-ups)
+                    if (!followUpResult.isFollowUp) {
+                        await setCachedResponse(body.message, { answer, sources: context.sources }, userContext?.professionalProfile || "entrepreneur");
+                    }
+                    
+                } catch (err) {
+                    console.error("Error in onFinish stream logic:", err);
+                }
             }
-
-        };
-
-
-
-        const finalResponse = chatResponse;
-
-        console.log(`│ API Response: ${chatResponse.answer.primaryBasis?.ref || "no primary"} | primaryBasisLaw: ${debugMeta.primaryBasisLaw}`);
-        
-        // ──────────────────────────────────────────────────────────────────
-        // SaaS: Usage Tracking & Observability
-        // ──────────────────────────────────────────────────────────────────
-        if (!isGuest) {
-            await incrementUsage(userId);
-        }
-        
-        await logUsage({
-            userId: userId,
-            conversationId: body.conversationId,
-            promptTokens: iterativeTokens, // Pre-calculate iterative overhead
-            completionTokens: 0,
-            model: OPENAI_MODEL || "mock",
-            durationMs: Date.now() - startTime,
-            status: "success",
-            ipAddress: req.headers.get("x-forwarded-for") || "local"
         });
 
+        return result.toTextStreamResponse();
 
-        // 6.5. Final Side Effects (Guest limit or DB Persistence)
-        if (isGuest) {
-            const currentCount = session?.questionCount || 0;
-            await updateSessionData({ 
-                questionCount: currentCount + 1 
-            });
-            console.log(`│ Guest Limit: ${currentCount + 1}/${GUEST_LIMIT} questions used`);
-        } else if (userId !== "unknown") {
-            try {
-                await saveConversation(userId, {
-                    id: body.conversationId,
-                    title: (body.history?.length === 0 && titleSuggestion) ? (titleSuggestion as string) : "Consulta Fiscal",
-                    mode: body.mode,
-                    detailLevel: body.detailLevel,
-                    archived: false,
-                    createdAt: Date.now(),
-                    updatedAt: Date.now()
-                });
-
-                await saveChatMsg({
-                    id: `user-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-                    conversationId: body.conversationId,
-                    role: "user",
-                    content: body.message,
-                    createdAt: Date.now()
-                });
-
-                await saveChatMsg({
-                    id: `asst-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-                    conversationId: body.conversationId,
-                    role: "assistant",
-                    content: chatResponse.answer,
-                    sources: chatResponse.sources,
-                    createdAt: Date.now()
-                });
-                console.log(`│ DB Storage: Persistent History updated.`);
-            } catch (dbErr) {
-                console.error("│ DB Storage Error:", dbErr);
-            }
-        }
-
-        return NextResponse.json(finalResponse);
     } catch (error: unknown) {
         const err = error as Error;
         // Observability logging

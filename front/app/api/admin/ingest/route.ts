@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+export const maxDuration = 60; // Max time for LLM parsing and vectorization
 import { parseLegalText, ExtractionResultSchema } from "@/lib/admin/document-parser";
 import { getSession } from "@/lib/session";
 import { getClient } from "@/lib/db";

@@ -164,13 +164,21 @@ export async function updateSubscription(userId: string, data: Partial<{
     const fields = Object.keys(data);
     if (fields.length === 0) return;
 
-    const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(", ");
-    const values = fields.map(f => (data as Record<string, unknown>)[f]);
-
-    await query(
-        `UPDATE subscriptions SET ${setClause}, updated_at = NOW() WHERE user_id = $1`,
-        [userId, ...values]
-    );
+    const { rows } = await query(`SELECT 1 FROM subscriptions WHERE user_id = $1`, [userId]);
+    
+    if (rows.length === 0) {
+        const cols = ["user_id", ...fields].join(", ");
+        const placeholders = ["$1", ...fields.map((_, i) => `$${i + 2}`)].join(", ");
+        const values = [userId, ...fields.map(f => (data as Record<string, unknown>)[f])];
+        await query(`INSERT INTO subscriptions (${cols}) VALUES (${placeholders})`, values);
+    } else {
+        const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(", ");
+        const values = fields.map(f => (data as Record<string, unknown>)[f]);
+        await query(
+            `UPDATE subscriptions SET ${setClause}, updated_at = NOW() WHERE user_id = $1`,
+            [userId, ...values]
+        );
+    }
 }
 
 export async function updateUserAvatar(userId: string, avatarUrl: string): Promise<void> {

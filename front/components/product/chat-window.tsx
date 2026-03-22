@@ -7,7 +7,7 @@ import { PromptSuggestions } from "./prompt-suggestions";
 import { MessageBubble } from "./message-bubble";
 import { Send, Loader2, Info, UserCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChatMode, DetailLevel, Message, ChatRequest, ChatResponse, LawArticlePayload, HistoryMessage, ChatUserProfile } from "@/lib/types";
+import { ChatMode, DetailLevel, Message, ChatRequest, ChatResponse, LawArticlePayload, HistoryMessage, ChatUserProfile, StructuredAnswer } from "@/lib/types";
 import { Storage } from "@/lib/storage";
 import { ArticleViewer } from "./article-viewer";
 import { USER_AVATAR_OPTIONS, resolveEffectiveAvatar } from "@/lib/avatar-options";
@@ -134,7 +134,7 @@ export function ChatWindow({
 
         const syncAvatarProfile = async () => {
             try {
-                const response = await fetch("/api/session/avatar", { cache: "no-store" });
+                const response = await fetch("/api/user/profile", { cache: "no-store" });
                 if (!response.ok) return;
                 const payload = await response.json() as SessionAvatarResponse;
                 setProfile(payload);
@@ -211,34 +211,31 @@ export function ChatWindow({
                     mode,
                     detailLevel: detail,
                     history
-                } as ChatRequest)
+                })
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                if (errorData.code === "GUEST_LIMIT_REACHED" || response.status === 403 || errorData.code === "USAGE_LIMIT_EXCEEDED") {
-                    const isGuest = errorData.code === "GUEST_LIMIT_REACHED";
-                    const handleUpgrade = async () => {
-                        try {
-                            const res = await fetch("/api/billing/create-checkout", { method: "POST" });
-                            if (res.ok) {
-                                const { url } = await res.json();
-                                window.location.href = url;
-                            }
-                        } catch (err) {
-                            console.error("Error creating checkout session:", err);
-                        }
-                    };
+                const isLimit = response.status === 429 || 
+                               response.status === 403 || 
+                               errorData.code === "GUEST_LIMIT_REACHED" || 
+                               errorData.code === "USAGE_LIMIT_EXCEEDED";
+
+                if (isLimit) {
+                    const isGuest = errorData.code === "GUEST_LIMIT_REACHED" || (!user);
+                    const isRateLimit = response.status === 429;
 
                     const limitMessage: Message = {
                         id: (Date.now() + 2).toString(),
                         conversationId: targetConvId,
                         role: "assistant",
                         content: {
-                            summary: isGuest ? "¡Has descubierto el potencial de MyFiscal!" : "Límite de Consultas Alcanzado",
-                            explanation: isGuest 
-                                ? "Como invitado, has alcanzado tu límite de consultas gratuitas. Para seguir obteniendo análisis legales de alta precisión, te invitamos a unirte a nuestra comunidad."
-                                : `Has alcanzado el límite de consultas permitidas para tu plan actual.`,
+                            summary: isRateLimit ? "Límite de ráfaga detectado" : (isGuest ? "¡Has descubierto el potencial de MyFiscal!" : "Límite de Consultas Alcanzado"),
+                            explanation: isRateLimit 
+                                ? "Has enviado demasiadas consultas en un periodo corto. Por favor, espera un momento antes de continuar."
+                                : (isGuest 
+                                    ? "Como invitado, has alcanzado tu límite de consultas gratuitas. Para seguir obteniendo análisis legales de alta precisión, te invitamos a unirte a nuestra comunidad."
+                                    : `Has alcanzado el límite de consultas permitidas para tu plan actual.`),
                             deductiveInsight: isGuest
                                 ? "Registrarte con Google es instantáneo y te permitirá mantener tu historial de consultas y acceder a funciones avanzadas de análisis jurídico."
                                 : "Puedes actualizar tu plan en cualquier momento para obtener un límite superior y acceso a herramientas profesionales de análisis fiscal.",
@@ -256,38 +253,87 @@ export function ChatWindow({
                         createdAt: Date.now()
                     };
                     setMessages(prev => [...prev, limitMessage]);
-                    
-                    if (isGuest) {
-                        Storage.saveMessage(limitMessage);
-                    }
-                    
-                    setIsTyping(false);
-
-                    // Add a custom property or just use the UI to render the button
-                    // Since Message content is StructuredAnswer, I'll add a check in MessageBubble or just use the ProactiveQuestion.
-                    // For now, let's keep it simple and just log that the limit was reached.
+                    if (isGuest) Storage.saveMessage(limitMessage);
                     return;
                 }
-                throw new Error("Error en la respuesta del asistente");
+                throw new Error(errorData.message || "Error en la respuesta del asistente");
             }
 
-            const data: ChatResponse = await response.json();
-
+            // Create placeholder for assistant message
+            const assistantMessageId = (Date.now() + 1).toString();
             const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
+                id: assistantMessageId,
                 conversationId: targetConvId,
                 role: "assistant",
-                content: data.answer,
-                sources: data.sources,
+                content: "", // Start empty
                 createdAt: Date.now()
             };
 
             setMessages(prev => [...prev, assistantMessage]);
-            Storage.saveMessage(assistantMessage);
 
-            // Handle title suggestion for new conversations
-            if (data.titleSuggestion && messages.length === 0) {
-                onUpdateTitle(data.titleSuggestion);
+            let fullText = "";
+            let metadata: any = {};
+
+            // Consume stream
+            if (response.body) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split("\n").filter(l => l.trim());
+                    
+                    for (const line of lines) {
+                        try {
+                            if (line.startsWith('0:')) { // Text chunk
+                                const textPart = JSON.parse(line.substring(2));
+                                fullText += textPart;
+                                
+                                // Update message in UI
+                                setMessages(prev => prev.map(m => 
+                                    m.id === assistantMessageId 
+                                        ? { ...m, content: fullText } 
+                                        : m
+                                ));
+                            } else if (line.startsWith('d:')) { // Data chunk (metadata)
+                                metadata = JSON.parse(line.substring(2));
+                            }
+                        } catch (e) {
+                            console.warn("Error parsing stream line:", line, e);
+                        }
+                    }
+                }
+            }
+
+            // Final message processing
+            let finalContent: string | StructuredAnswer = fullText;
+            try {
+                // Check if fullText is a JSON string (for StructuredAnswer)
+                if (fullText.trim().startsWith('{')) {
+                    finalContent = JSON.parse(fullText);
+                }
+            } catch (e) {
+                console.warn("Final text was not JSON:", fullText);
+            }
+
+            const updatedAssistantMessage: Message = {
+                ...assistantMessage,
+                content: finalContent,
+                sources: metadata.sources
+            };
+
+            setMessages(prev => prev.map(m => 
+                m.id === assistantMessageId ? updatedAssistantMessage : m
+            ));
+
+            Storage.saveMessage(updatedAssistantMessage);
+
+            // Handle title suggestion
+            if (metadata.titleSuggestion && messages.length === 0) {
+                onUpdateTitle(metadata.titleSuggestion);
             }
 
         } catch (error) {
@@ -349,7 +395,7 @@ export function ChatWindow({
         setIsAvatarSaving(true);
 
         try {
-            const response = await fetch("/api/session/avatar", {
+            const response = await fetch("/api/user/profile", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ avatarUrl: nextAvatarUrl })

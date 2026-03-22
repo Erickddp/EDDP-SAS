@@ -20,10 +20,11 @@ const pool = new Pool({
   ssl: {
     rejectUnauthorized: false
   },
-  connectionTimeoutMillis: 15000,
-  idleTimeoutMillis: 30000,
-  max: 10,
-  keepAlive: true,
+  // Serverless optimization for Vercel + Supabase Pooler (6543)
+  max: 3, 
+  min: 0,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 5000,
 });
 
 export async function query<T extends QueryResultRow = any>(
