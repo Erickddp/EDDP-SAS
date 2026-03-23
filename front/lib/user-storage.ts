@@ -207,3 +207,54 @@ export async function updateUserProfile(userId: string, data: { name?: string; p
         [userId, ...values]
     );
 }
+
+export interface UserPreferences {
+    expertiseLevel: string;
+    preferredTone: string;
+    industryContext: string | null;
+    additionalContext: string | null;
+    isProfileComplete: boolean;
+}
+
+export async function getUserPreferences(userId: string): Promise<UserPreferences | null> {
+    const { rows } = await query(
+        `SELECT expertise_level, preferred_tone, industry_context, additional_context, is_profile_complete 
+         FROM user_preferences WHERE user_id = $1`,
+        [userId]
+    );
+    
+    if (rows.length === 0) return null;
+    
+    const r = rows[0];
+    return {
+        expertiseLevel: r.expertise_level,
+        preferredTone: r.preferred_tone,
+        industryContext: r.industry_context,
+        additionalContext: r.additional_context,
+        isProfileComplete: r.is_profile_complete
+    };
+}
+
+export async function updateUserPreferences(userId: string, data: Partial<UserPreferences>): Promise<void> {
+    const fields = Object.keys(data);
+    if (fields.length === 0) return;
+
+    // Map camelCase to snake_case
+    const mapping: Record<string, string> = {
+        expertiseLevel: "expertise_level",
+        preferredTone: "preferred_tone",
+        industryContext: "industry_context",
+        additionalContext: "additional_context",
+        isProfileComplete: "is_profile_complete"
+    };
+
+    const setClause = fields.map((f, i) => `${mapping[f] || f} = $${i + 2}`).join(", ");
+    const values = fields.map(f => (data as any)[f]);
+
+    await query(
+        `INSERT INTO user_preferences (user_id, ${fields.map(f => mapping[f] || f).join(", ")})
+         VALUES ($1, ${fields.map((_, i) => `$${i + 2}`).join(", ")})
+         ON CONFLICT (user_id) DO UPDATE SET ${setClause}, updated_at = NOW()`,
+        [userId, ...values]
+    );
+}

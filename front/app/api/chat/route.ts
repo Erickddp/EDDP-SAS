@@ -22,7 +22,7 @@ import { openaiModel } from "@/lib/openai";
 import { cn, isUuid } from "@/lib/utils";
 
 import { CONFIG } from "@/lib/env-config";
-import { getSubscriptionByUserId, getUserById, getUserByEmail, createUser } from "@/lib/user-storage";
+import { getSubscriptionByUserId, getUserById, getUserByEmail, createUser, getUserPreferences } from "@/lib/user-storage";
 import { checkUsageLimit, incrementUsage } from "@/lib/usage-enforcer";
 import { logUsage } from "@/lib/observability";
 import { handleApiError, AppErrorType, validatedMethod } from "@/lib/error-handler";
@@ -148,25 +148,29 @@ export async function POST(req: Request) {
             }
         }
 
-        // Phase 7: Profile context for AI
-        let userContext: { name: string; role: string; plan?: string; professionalProfile?: string | null } | undefined = undefined;
+        // Phase 10: Profile context for AI (Enhanced Personalization)
+        let userContext: any = undefined;
 
         if (session) {
+            const preferences = await getUserPreferences(session.id);
             userContext = {
                 name: session.name,
                 role: session.role,
                 plan: session.plan,
-                professionalProfile: session.professionalProfile
+                professionalProfile: session.professionalProfile,
+                ...preferences
             };
         } else if (req.headers.get('x-test-bypass') === process.env.SESSION_SECRET && body.userId) {
             // Bypass user context recovery for testing
             const testUser = await getUserById(body.userId);
             if (testUser) {
+                const preferences = await getUserPreferences(body.userId);
                 userContext = {
                     name: testUser.name,
                     role: testUser.role,
-                    plan: testUser.plan,
-                    professionalProfile: testUser.professionalProfile
+                    plan: (testUser as any).plan,
+                    professionalProfile: testUser.professionalProfile,
+                    ...preferences
                 };
             }
         }
@@ -432,7 +436,17 @@ export async function POST(req: Request) {
         const hasExactMatch = !!parsedRef.lawAbbreviation && !!parsedRef.articleNumber && context.retrievedArticles.length > 0;
         const retrievalStrategy = hasExactMatch ? 'exact-law-article' : (context.retrievalMeta?.strategy || "standard");
         const finalRetrievalStrategy = effectiveRetrievalStrategy === "context-aware" ? "context-aware" : retrievalStrategy;
-        const titleSuggestion = (body.history?.length === 0) ? "Consulta Fiscal" : "Consulta";
+        
+        // Generate dynamic title from keywords for first message
+        let titleSuggestion = "Nueva consulta";
+        if (body.history?.length === 0) {
+            const keywords = queryDebug.matchedKeywords?.slice(0, 2).map((k: string) => k.charAt(0).toUpperCase() + k.slice(1)) || [];
+            if (keywords.length > 0) {
+                titleSuggestion = keywords.join(" y ");
+            } else {
+                titleSuggestion = queryAnalysis.detectedIntent.charAt(0).toUpperCase() + queryAnalysis.detectedIntent.slice(1);
+            }
+        }
 
         // Validate API Key
         if (!CONFIG.OPENAI_API_KEY) {

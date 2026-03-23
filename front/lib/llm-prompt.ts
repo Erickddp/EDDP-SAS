@@ -80,7 +80,16 @@ interface PromptConfig {
     queryAnalysis?: QueryAnalysis;
     isFollowUp?: boolean;
     previousTopic?: string;
-    userContext?: { name: string; role: string; plan?: string; professionalProfile?: string | null };
+    userContext?: { 
+        name: string; 
+        role: string; 
+        plan?: string; 
+        professionalProfile?: string | null;
+        expertiseLevel?: string;
+        preferredTone?: string;
+        industryContext?: string | null;
+        additionalContext?: string | null;
+    };
 }
 
 export function buildSystemPrompt(config: PromptConfig): string {
@@ -158,11 +167,26 @@ export function buildSystemPrompt(config: PromptConfig): string {
 `;
     }
 
-    const personalizationRules = userContext 
-        ? `\n### PERSONALIZACIÓN (PHASE 8C)
-1. SALUDO: Saluda a ${userContext.name} de forma natural al inicio.
+    let personalizationRules = "";
+    if (userContext) {
+        const u = userContext as any;
+        const hasAdvancedPrefs = !!u.expertiseLevel;
+
+        personalizationRules = `\n### PERSONALIZACIÓN (PHASE 10)
+1. SALUDO: Saluda a ${userContext.name} de forma natural al inicio en el summary.
 2. CONTEXTO PROFESIONAL: Usuario identificado como **${profile}**. ${profileInstructions}
-` : "";
+`;
+
+        if (hasAdvancedPrefs) {
+            personalizationRules += `
+3. PREFERENCIAS ESPECÍFICAS (PRIORIDAD ALTA):
+   - NIVEL DE CONOCIMIENTO: ${u.expertiseLevel}. (Ajusta el rigor técnico).
+   - TONO DE RESPUESTA: ${u.preferredTone}. (Sé estrictamente ${u.preferredTone}).
+   - SECTOR/RÉGIMEN: ${u.industryContext || 'General'}. (Enfoca las implicaciones en este sector).
+   - INFO EXTRA: ${u.additionalContext || 'N/A'}.
+`;
+        }
+    }
 
 
     let systemInstructions = `Eres MyFiscal, un motor de razonamiento jurídico experto en leyes mexicanas (CFF, LISR, LIVA).

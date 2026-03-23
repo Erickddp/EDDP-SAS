@@ -67,8 +67,7 @@ export function UserProfileMenu({ user, isCollapsed = false }: UserProfileMenuPr
                     </div>
 
                     <div className="p-1.5">
-                        <MenuItem icon={<User size={14} />} label="Mi Cuenta" href="/account" />
-                        <MenuItem icon={<Settings size={14} />} label="Configuración" href="/settings" />
+                        <MenuItem icon={<Settings size={14} />} label="Ajustes" href="/account" />
                         {user.plan === 'gratis' && (
                              <MenuItem 
                                 icon={<Sparkles size={14} className="text-cyan-main" />} 

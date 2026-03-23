@@ -15,6 +15,7 @@ export function ChatClient({ initialSession }: ChatClientProps) {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [isMobile, setIsMobile] = useState(false);
     const [prefs, setPrefs] = useState<UserPreferences>({ lastMode: "casual", lastDetailLevel: "sencilla" });
 
     useEffect(() => {
@@ -53,7 +54,10 @@ export function ChatClient({ initialSession }: ChatClientProps) {
         loadInitialData();
 
         const handleResize = () => {
-            if (window.innerWidth < 768) {
+            const mobile = window.innerWidth < 768;
+            setIsMobile(mobile);
+
+            if (mobile) {
                 setSidebarOpen(false);
             } else {
                 setSidebarOpen(true);
@@ -171,6 +175,7 @@ export function ChatClient({ initialSession }: ChatClientProps) {
         <>
             <Sidebar
                 isOpen={sidebarOpen}
+                isMobile={isMobile}
                 onToggle={() => setSidebarOpen(!sidebarOpen)}
                 conversations={conversations}
                 activeId={activeId || undefined}
@@ -181,6 +186,15 @@ export function ChatClient({ initialSession }: ChatClientProps) {
                 onDelete={handleDeleteConversation}
                 user={initialSession} // Pass user to Sidebar for profile rendering
             />
+
+            {isMobile && sidebarOpen && (
+                <button
+                    type="button"
+                    aria-label="Cerrar barra lateral"
+                    className="fixed inset-0 z-30 bg-slate-950/30 backdrop-blur-[2px] md:hidden"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
 
             <div className="flex-1 min-w-0 flex flex-col relative z-10 w-full h-[100dvh]">
                 <ChatWindow
@@ -194,18 +208,10 @@ export function ChatClient({ initialSession }: ChatClientProps) {
                     conversationTitle={activeId ? conversations.find(c => c.id === activeId)?.title : undefined}
                     conversationTags={activeId ? conversations.find(c => c.id === activeId)?.tags : undefined}
                     user={initialSession}
+                    onOpenSidebar={() => setSidebarOpen(true)}
+                    isMobile={isMobile}
                 />
             </div>
-
-            {!sidebarOpen && (
-                <button
-                    onClick={() => setSidebarOpen(true)}
-                    className="fixed top-4 left-4 z-50 rounded-xl bg-bg-sec border border-border-glow p-2 text-text-sec shadow-2xl md:hidden active:scale-95 transition-all h-10 w-10 flex items-center justify-center overflow-hidden"
-                >
-                    <img src="/icono.png" alt="Menu" className="h-6 w-6 object-contain dark:hidden" />
-                    <img src="/icono2.png" alt="Menu" className="h-6 w-6 object-contain hidden dark:block" />
-                </button>
-            )}
         </>
     );
 }

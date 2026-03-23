@@ -16,7 +16,7 @@ export function PromptSuggestions({ onSelect }: PromptSuggestionsProps) {
     ];
 
     return (
-        <div className="grid gap-3 sm:grid-cols-2 lg:gap-4 mt-8 w-full max-w-4xl mx-auto">
+        <div className="mx-auto mt-6 grid w-full max-w-4xl gap-2 sm:mt-8 sm:grid-cols-2 lg:gap-4">
             {suggestions.map((prompt, i) => (
                 <motion.button
                     key={i}
@@ -24,10 +24,10 @@ export function PromptSuggestions({ onSelect }: PromptSuggestionsProps) {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: i * 0.1 }}
                     onClick={() => onSelect(prompt)}
-                    className="group flex items-start gap-4 rounded-xl border border-border-glow bg-bg-sec/50 p-4 text-left transition-all hover:border-cyan-main/40 hover:bg-bg-sec/80 hover:shadow-[0_0_15px_rgba(32,196,255,0.05)]"
+                    className="group flex items-start gap-3 rounded-xl border border-border-glow bg-bg-sec/50 p-3 text-left transition-all hover:border-cyan-main/40 hover:bg-bg-sec/80 hover:shadow-[0_0_15px_rgba(32,196,255,0.05)] sm:gap-4 sm:p-4"
                 >
                     <div className="flex flex-1 flex-col">
-                        <span className="text-sm font-medium text-text-sec transition-colors group-hover:text-text-main line-clamp-2">
+                        <span className="line-clamp-2 text-sm font-medium text-text-sec transition-colors group-hover:text-text-main">
                             {prompt}
                         </span>
                     </div>
