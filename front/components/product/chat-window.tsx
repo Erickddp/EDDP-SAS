@@ -15,6 +15,7 @@ import { USER_AVATAR_OPTIONS, resolveEffectiveAvatar } from "@/lib/avatar-option
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { ProfileSettingsModal } from "./profile-settings-modal";
 import { UserProfileMenu } from "./user-profile-menu";
+import { cn } from "@/lib/utils";
 
 interface ChatWindowProps {
     conversationId: string | null;
