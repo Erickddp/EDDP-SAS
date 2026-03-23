@@ -13,7 +13,7 @@ export default async function MarketingPage() {
     return (
         <>
             <Header user={user} forceGuestView hasSession={hasSession} />
-            <main className="flex-1 relative w-full">
+            <main className="flex-1 relative w-full transition-colors duration-300">
                 <HeroArea hasSession={hasSession} />
                 <ValueStorytelling />
                 <PricingMatrix hasSession={hasSession} />

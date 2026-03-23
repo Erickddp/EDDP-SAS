@@ -121,7 +121,7 @@ export function MessageBubble({
             transition={{ duration: 0.4 }}
             className={cn("flex w-full mb-8", isUser ? "justify-end" : "justify-start")}
         >
-            <div className={cn("flex w-full gap-4", isUser ? "max-w-[85%] sm:max-w-[70%] flex-row-reverse" : "max-w-[100%] sm:max-w-[90%] flex-row")}>
+            <div className={cn("flex w-full gap-4", isUser ? "max-w-[85%] sm:max-w-[70%] flex-row" : "max-w-[100%] sm:max-w-[90%] flex-row-reverse")}>
                 <div
                     className={cn(
                         "relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border mt-1 shadow-sm",
@@ -171,8 +171,8 @@ export function MessageBubble({
                         className={cn(
                             "rounded-2xl px-5 py-4 text-[15px] leading-relaxed w-full shadow-sm",
                             isUser
-                                ? "bg-cyan-main/12 border border-cyan-main/35 text-text-main rounded-tr-sm shadow-[0_0_20px_rgba(32,196,255,0.08)]"
-                                : "bg-bg-sec border border-border-glow text-text-main rounded-tl-sm shadow-sm"
+                                ? "bg-cyan-main/12 border border-cyan-main/35 text-text-main rounded-tl-sm shadow-[0_0_20px_rgba(32,196,255,0.08)]"
+                                : "bg-bg-sec border border-border-glow text-text-main rounded-tr-sm shadow-sm"
                         )}
                     >
                         {typeof content === "string" ? (

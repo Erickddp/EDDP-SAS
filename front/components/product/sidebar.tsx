@@ -39,6 +39,7 @@ export function Sidebar({
     const [showArchived, setShowArchived] = useState(false);
     const activeConversations = conversations.filter((conversation) => !conversation.archived);
     const archivedConversations = conversations.filter((conversation) => conversation.archived);
+    const isNonProPlan = !user || (user.plan !== "pro" && user.plan !== "despacho" && user.plan !== "basic");
 
     return (
         <aside
@@ -55,21 +56,22 @@ export function Sidebar({
                     )
             )}
         >
-            <div className="flex h-16 items-center justify-between px-4 border-b border-border-glow shrink-0">
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-border-glow px-4">
                 {isOpen ? (
                     <Link href="/" className="flex items-center gap-2 px-2">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white dark:bg-bg-sec border border-border-glow shadow-sm overflow-hidden p-1.5">
+                        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-border-glow bg-white p-1.5 shadow-sm dark:bg-bg-sec">
                             <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain dark:hidden" />
-                            <img src="/icono2.png" alt="MyFiscal" className="h-full w-full object-contain hidden dark:block" />
+                            <img src="/icono2.png" alt="MyFiscal" className="hidden h-full w-full object-contain dark:block" />
                         </div>
                         <span className="text-lg font-bold text-text-main">MyFiscal</span>
                     </Link>
                 ) : (
-                    <Link href="/" className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-white dark:bg-bg-sec border border-border-glow shadow-sm hover:border-cyan-main/30 transition-all overflow-hidden p-1.5 shrink-0">
+                    <Link href="/" className="mx-auto flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border-glow bg-white p-1.5 shadow-sm transition-all hover:border-cyan-main/30 dark:bg-bg-sec">
                         <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain dark:hidden" />
-                        <img src="/icono2.png" alt="MyFiscal" className="h-full w-full object-contain hidden dark:block" />
+                        <img src="/icono2.png" alt="MyFiscal" className="hidden h-full w-full object-contain dark:block" />
                     </Link>
                 )}
+
                 {onToggle && (
                     <button
                         onClick={onToggle}
@@ -81,13 +83,13 @@ export function Sidebar({
                 )}
             </div>
 
-            <div className="p-4 flex-none">
+            <div className="flex-none p-4">
                 <Button
                     variant="outline"
                     onClick={onNew}
                     className={cn(
-                        "w-full justify-start gap-2 shadow-[0_0_10px_rgba(32,196,255,0.05)] border-cyan-main/20 hover:border-cyan-main/50",
-                        !isOpen ? "justify-center px-0 h-10 w-10 mx-auto" : ""
+                        "w-full justify-start gap-2 border-cyan-main/20 shadow-[0_0_10px_rgba(32,196,255,0.05)] hover:border-cyan-main/50",
+                        !isOpen ? "mx-auto h-10 w-10 justify-center px-0" : ""
                     )}
                 >
                     <Plus size={18} className={!isOpen ? "shrink-0" : ""} />
@@ -126,7 +128,7 @@ export function Sidebar({
                                         {archivedConversations.map((conv) => (
                                             <div
                                                 key={conv.id}
-                                                className="group flex w-full items-center gap-3 rounded-lg border border-transparent py-2.5 px-3 text-sm text-text-sec/90 transition-all hover:bg-bg-sec"
+                                                className="group flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-sm text-text-sec/90 transition-all hover:bg-bg-sec"
                                             >
                                                 <button
                                                     onClick={() => onSelect?.(conv.id)}
@@ -137,14 +139,14 @@ export function Sidebar({
                                                 </button>
                                                 <button
                                                     onClick={() => onRestore?.(conv.id)}
-                                                    className="rounded-md p-1.5 text-text-sec hover:bg-bg-main hover:text-cyan-main transition-colors"
+                                                    className="rounded-md p-1.5 text-text-sec transition-colors hover:bg-bg-main hover:text-cyan-main"
                                                     title="Restaurar chat"
                                                 >
                                                     <ArchiveRestore size={14} />
                                                 </button>
                                                 <button
                                                     onClick={() => onDelete?.(conv.id)}
-                                                    className="rounded-md p-1.5 text-text-sec hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                                                    className="rounded-md p-1.5 text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400"
                                                     title="Eliminar chat"
                                                 >
                                                     <Trash2 size={14} />
@@ -163,11 +165,11 @@ export function Sidebar({
                         <div
                             key={conv.id}
                             className={cn(
-                                "group flex w-full items-center gap-3 rounded-xl py-2.5 text-sm transition-all border",
-                                isOpen ? "px-3" : "justify-center px-0 hover:bg-bg-sec/80 h-10 w-10 mx-auto",
+                                "group flex w-full items-center gap-3 rounded-xl border py-2.5 text-sm transition-all",
+                                isOpen ? "px-3" : "mx-auto h-10 w-10 justify-center px-0 hover:bg-bg-sec/80",
                                 activeId === conv.id
-                                    ? "bg-cyan-main/10 text-cyan-main border-cyan-main/20"
-                                    : "text-text-sec hover:bg-bg-sec hover:text-cyan-main border-transparent"
+                                    ? "border-cyan-main/20 bg-cyan-main/10 text-cyan-main"
+                                    : "border-transparent text-text-sec hover:bg-bg-sec hover:text-cyan-main"
                             )}
                             title={!isOpen ? conv.title : undefined}
                         >
@@ -178,24 +180,32 @@ export function Sidebar({
                                     isOpen ? "flex-1" : "h-10 w-10 justify-center"
                                 )}
                             >
-                                <MessageSquare size={16} className={cn(
-                                    "shrink-0",
-                                    activeId === conv.id ? "text-cyan-main" : "text-text-sec group-hover:text-cyan-main"
-                                )} />
-                                {isOpen && <span className={cn("truncate flex-1", activeId === conv.id ? "font-bold" : "font-medium")}>{conv.title}</span>}
+                                <MessageSquare
+                                    size={16}
+                                    className={cn(
+                                        "shrink-0",
+                                        activeId === conv.id ? "text-cyan-main" : "text-text-sec group-hover:text-cyan-main"
+                                    )}
+                                />
+                                {isOpen && (
+                                    <span className={cn("truncate flex-1", activeId === conv.id ? "font-bold" : "font-medium")}>
+                                        {conv.title}
+                                    </span>
+                                )}
                             </button>
+
                             {isOpen && (
                                 <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                                     <button
                                         onClick={() => onArchive?.(conv.id)}
-                                        className="rounded-md p-1.5 text-text-sec hover:bg-bg-main hover:text-cyan-main transition-colors"
+                                        className="rounded-md p-1.5 text-text-sec transition-colors hover:bg-bg-main hover:text-cyan-main"
                                         title="Archivar chat"
                                     >
                                         <Archive size={14} />
                                     </button>
                                     <button
                                         onClick={() => onDelete?.(conv.id)}
-                                        className="rounded-md p-1.5 text-text-sec hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                                        className="rounded-md p-1.5 text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-400"
                                         title="Eliminar chat"
                                     >
                                         <Trash2 size={14} />
@@ -207,42 +217,38 @@ export function Sidebar({
                 </nav>
             </div>
 
-            <div className={cn("mt-auto border-t border-border-glow flex flex-col gap-2 transition-all p-3", !isOpen ? "items-center" : "")}>
-                {/* Subscription Banner (Conditional) */}
-                {(!user || (user.plan !== 'pro' && user.plan !== 'despacho' && user.plan !== 'basic')) && (
-                    <div className={cn(
-                        "rounded-xl border border-cyan-main/20 bg-cyan-main/5 relative overflow-hidden transition-all duration-300",
-                        isOpen ? "p-4" : "h-1 w-full bg-cyan-main/10 border-none p-0 overflow-hidden opacity-30"
-                    )}>
+            <div className={cn("mt-auto flex flex-col gap-2 border-t border-border-glow p-3 transition-all", !isOpen ? "items-center" : "")}>
+                {isNonProPlan && (
+                    <div
+                        className={cn(
+                            "relative overflow-hidden rounded-xl border border-cyan-main/20 bg-cyan-main/5 transition-all duration-300",
+                            isOpen ? "p-4" : "h-1 w-full overflow-hidden border-none bg-cyan-main/10 p-0 opacity-30"
+                        )}
+                    >
                         {isOpen && (
                             <>
-                                <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-main/10 blur-xl rounded-full" aria-hidden="true" />
-                                <div className="text-[10px] font-bold text-cyan-main mb-1 uppercase tracking-widest opacity-80">Edición Beta</div>
-                                <h4 className="text-sm font-bold text-text-main mb-2">
-                                    {user && user.role !== 'guest' ? `Plan ${user.plan || 'Gratis'}` : 'Acceso Gratuito'}
+                                <div className="absolute right-0 top-0 h-16 w-16 rounded-full bg-cyan-main/10 blur-xl" aria-hidden="true" />
+                                <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-cyan-main opacity-80">Edicion beta</div>
+                                <h4 className="mb-2 text-sm font-bold text-text-main">
+                                    {user && user.role !== "guest" ? `Plan ${user.plan || "Gratis"}` : "Acceso gratuito"}
                                 </h4>
-                                {(!user || user.role === 'guest') && (
-                                    <>
-                                        <p className="text-[10px] text-text-sec mb-3 leading-relaxed">
-                                            Límite de 5 consultas. Regístrate para acceso ilimitado.
-                                        </p>
-                                        <Link href="/register" className="w-full">
-                                            <Button
-                                                variant="primary"
-                                                size="sm"
-                                                className="w-full text-[10px] h-7 shadow-sm transition-all uppercase font-black tracking-tighter"
-                                            >
-                                                Registrarse Gratis
-                                            </Button>
-                                        </Link>
-                                    </>
-                                )}
+                                <p className="mb-3 text-[10px] leading-relaxed text-text-sec">
+                                    Sube a Pro para mas consultas y mayor respaldo en cada analisis.
+                                </p>
+                                <Link href="/dashboard/billing" className="w-full">
+                                    <Button
+                                        variant="primary"
+                                        size="sm"
+                                        className="h-7 w-full text-[10px] font-black uppercase tracking-tighter shadow-sm transition-all"
+                                    >
+                                        Subir a Pro
+                                    </Button>
+                                </Link>
                             </>
                         )}
                     </div>
                 )}
 
-                {/* Identity Hub */}
                 <UserProfileMenu
                     user={user || null}
                     isCollapsed={!isOpen}

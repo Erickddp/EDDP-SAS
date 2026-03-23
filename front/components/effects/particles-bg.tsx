@@ -1,8 +1,27 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 
-export function ParticlesBg() {
+interface ParticlesBgProps {
+    className?: string;
+    density?: number;
+    maxParticles?: number;
+    sizeRange?: [number, number];
+    speedRange?: [number, number];
+    opacityRange?: [number, number];
+    color?: string;
+}
+
+export function ParticlesBg({
+    className,
+    density = 10,
+    maxParticles = 180,
+    sizeRange = [0.8, 3.2],
+    speedRange = [0.2, 0.8],
+    opacityRange = [0.2, 0.7],
+    color = "14, 165, 233"
+}: ParticlesBgProps = {}) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -17,14 +36,14 @@ export function ParticlesBg() {
 
         const initParticles = () => {
             particles = [];
-            const numParticles = Math.min(Math.floor(window.innerWidth / 20), 60); // Responsive amount, kept lightweight
+            const numParticles = Math.min(Math.floor(window.innerWidth / density), maxParticles);
             for (let i = 0; i < numParticles; i++) {
                 particles.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    s: Math.random() * 1.5 + 0.5, // size 0.5 to 2
-                    vY: Math.random() * 0.4 + 0.1, // velocity Y (upwards)
-                    op: Math.random() * 0.4 + 0.1, // opacity 0.1 to 0.5
+                    s: Math.random() * (sizeRange[1] - sizeRange[0]) + sizeRange[0],
+                    vY: Math.random() * (speedRange[1] - speedRange[0]) + speedRange[0],
+                    op: Math.random() * (opacityRange[1] - opacityRange[0]) + opacityRange[0],
                 });
             }
         };
@@ -48,7 +67,7 @@ export function ParticlesBg() {
 
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.s, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(83, 211, 255, ${p.op})`;
+                ctx.fillStyle = `rgba(${color}, ${p.op})`;
                 ctx.fill();
             });
 
@@ -68,7 +87,10 @@ export function ParticlesBg() {
     return (
         <canvas
             ref={canvasRef}
-            className="pointer-events-none fixed inset-0 z-0 h-full w-full opacity-60 hidden dark:block"
+            className={cn(
+                "pointer-events-none fixed inset-0 z-0 h-full w-full opacity-40 transition-opacity duration-1000",
+                className
+            )}
             aria-hidden="true"
         />
     );
