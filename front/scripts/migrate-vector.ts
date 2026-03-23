@@ -1,14 +1,16 @@
 import "./load-env";
 import { Pool } from 'pg';
 
+const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   ssl: { rejectUnauthorized: false },
 });
 
 async function run() {
-  if (!process.env.DATABASE_URL) {
-    console.error("❌ DATABASE_URL missing");
+  if (!connectionString) {
+    console.error("❌ DIRECT_URL or DATABASE_URL missing");
     return;
   }
   const client = await pool.connect();

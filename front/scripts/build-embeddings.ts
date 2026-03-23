@@ -1,12 +1,24 @@
 import "./load-env";
-import { getClient } from "../lib/db";
+import { Pool } from 'pg';
 import { generateEmbedding } from "../lib/embedding";
 
 // Función de espera para delays
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const dbUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+if (!dbUrl) {
+  console.error("❌ Error: DIRECT_URL o DATABASE_URL no definida.");
+  process.exit(1);
+}
+
+const pool = new Pool({
+  connectionString: dbUrl,
+  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 15000
+});
+
 async function run() {
-  const client = await getClient();
+  const client = await pool.connect();
   try {
     console.log(`🚀 Iniciando generación estructurada de embeddings para la tabla 'articles'...`);
     

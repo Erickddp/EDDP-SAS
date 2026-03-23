@@ -8,13 +8,15 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 async function upgradeArticlesTable() {
     console.log("🛠️  Iniciando actualización de la tabla 'articles'...");
     
-    if (!process.env.DATABASE_URL) {
-        console.error("❌ Error: DATABASE_URL no está definida en .env");
+    const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
+
+    if (!connectionString) {
+        console.error("❌ Error: DIRECT_URL o DATABASE_URL no está definida en .env");
         process.exit(1);
     }
 
     const client = new Client({
-        connectionString: process.env.DATABASE_URL,
+        connectionString,
         ssl: { rejectUnauthorized: false }
     });
 

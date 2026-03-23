@@ -3,10 +3,10 @@ import fs from 'fs';
 import path from 'path';
 import { Pool } from 'pg';
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
 
 if (!connectionString) {
-  console.error('❌ Error: DATABASE_URL not found in .env.local');
+  console.error('❌ Error: DIRECT_URL or DATABASE_URL not found in .env.local');
   process.exit(1);
 }
 

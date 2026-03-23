@@ -48,60 +48,56 @@ export async function GET(request: Request) {
             throw new Error("Google profile has no email associated.");
         }
 
-        // 3. OPTIMIZATION: Extract user_metadata directly and build session
-        // This follows the 'Directiva del Fundador': session doesn't wait for DB.
-        const name = googleUser.name || googleUser.given_name || "Usuario Google";
+        // 3. DATABASE SYNC & UUID RESOLUTION
+        // Extract metadata for potential new user creation
+        const name: string = googleUser.name || googleUser.given_name || "Usuario Google";
         const avatar = googleUser.picture || getRandomAvatar(googleUser.email);
-        
-        const initialSessionData = {
-            id: googleUser.id, // Temporary ID fallback to Google Subject ID
-            email: googleUser.email,
-            name: name,
-            role: "user" as const,
-            avatarUrl: avatar,
-            googleAvatarUrl: googleUser.picture || null,
-            plan: "gratis" as const, // Default, background sync will verify
-            professionalProfile: null,
-            subscriptionStatus: "active" as const,
+
+        // To resolve "invalid input syntax for type uuid", we must use the DB UUID, not the Google ID.
+        let userRecord = null;
+        try {
+            userRecord = await getUserByEmail(googleUser.email);
+
+            if (!userRecord) {
+                userRecord = await createUser({
+                    email: googleUser.email,
+                    name: name,
+                    passwordHash: "google-social-auth",
+                    avatarUrl: avatar,
+                    googleAvatarUrl: googleUser.picture || null,
+                    role: "user",
+                });
+                console.log(`[GOOGLE AUTH] New user created: ${userRecord.email} (${userRecord.id})`);
+            }
+        } catch (dbError: any) {
+            console.error("[GOOGLE AUTH] Database sync failed during login:", dbError.message);
+            // If the database is down, we cannot proceed with a persistent UUID session.
+            return NextResponse.redirect(new URL("/login?error=Base de datos no disponible", request.url));
+        }
+
+        if (!userRecord) {
+            return NextResponse.redirect(new URL("/login?error=Usuario no encontrado", request.url));
+        }
+
+        // 4. Create Session with Database UUID
+        // This solves the 'invalid input syntax for type uuid' error.
+        const sessionData = {
+            id: userRecord.id, // Now using the real UUID
+            email: userRecord.email,
+            name: userRecord.name || name,
+            role: userRecord.role || "user",
+            avatarUrl: userRecord.avatarUrl || avatar,
+            googleAvatarUrl: userRecord.googleAvatarUrl || googleUser.picture || null,
+            plan: userRecord.plan || "gratis",
+            professionalProfile: userRecord.professionalProfile || null,
+            subscriptionStatus: userRecord.subscriptionStatus || "active",
         };
 
-        // 4. Create Session IMMEDIATELY
-        await createSession(initialSessionData);
+        await createSession(sessionData);
 
-        // 5. ASYNC SYNC: Sync user to DB in the background without blocking the redirect
-        // This resolves the 'ENOTFOUND' bottleneck in production callback.
-        (async () => {
-            try {
-                console.log(`[AUTH BACKGROUND] Starting sync for ${googleUser.email}`);
-                let userRecord = await getUserByEmail(googleUser.email);
+        console.log(`[GOOGLE AUTH] Success: ${userRecord.email} | Session ID: ${userRecord.id}`);
 
-                if (!userRecord) {
-                    userRecord = await createUser({
-                        email: googleUser.email,
-                        name: name,
-                        passwordHash: "google-social-auth",
-                        avatarUrl: avatar,
-                        googleAvatarUrl: googleUser.picture || null,
-                        role: "user",
-                    });
-                    console.log(`[AUTH BACKGROUND] New user created in DB: ${userRecord.email}`);
-                } else {
-                    console.log(`[AUTH BACKGROUND] Existing user synced: ${userRecord.email}`);
-                }
-
-                // If DB record has different data (plan, id), it will be picked up on next page refresh 
-                // or we could potentially update the session here if the environment allows.
-                // For now, the continuity is preserved by the Google data.
-            } catch (bgError: any) {
-                // Log but don't crash the already redirected user.
-                console.error("[AUTH BACKGROUND_CRITICAL] Sync error (resolvability issue?):", bgError.message);
-                // System remains functional because session was already granted.
-            }
-        })();
-
-        console.log(`[GOOGLE AUTH] Success (Session redirected): ${googleUser.email}`);
-
-        // 6. Redirect to chat immediately
+        // 5. Redirect to chat
         return NextResponse.redirect(new URL("/chat", request.url));
 
     } catch (error: any) {
