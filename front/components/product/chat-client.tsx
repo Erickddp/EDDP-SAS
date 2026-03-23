@@ -194,7 +194,8 @@ export function ChatClient({ initialSession }: ChatClientProps) {
                     onClick={() => setSidebarOpen(true)}
                     className="fixed top-4 left-4 z-50 rounded-xl bg-bg-sec border border-border-glow p-2 text-text-sec shadow-2xl md:hidden active:scale-95 transition-all h-10 w-10 flex items-center justify-center overflow-hidden"
                 >
-                    <img src="/icono.png" alt="Menu" className="h-6 w-6 object-contain" />
+                    <img src="/icono.png" alt="Menu" className="h-6 w-6 object-contain dark:hidden" />
+                    <img src="/icono2.png" alt="Menu" className="h-6 w-6 object-contain hidden dark:block" />
                 </button>
             )}
         </>

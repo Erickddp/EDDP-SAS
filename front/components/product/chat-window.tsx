@@ -480,7 +480,8 @@ export function ChatWindow({
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-bg-sec border border-border-glow shadow-sm p-2 overflow-hidden">
-                            <img src="/icono.png" alt="MyFiscal" className="w-full h-full object-contain" />
+                            <img src="/icono.png" alt="MyFiscal" className="w-full h-full object-contain dark:hidden" />
+                            <img src="/icono2.png" alt="MyFiscal" className="w-full h-full object-contain hidden dark:block" />
                         </div>
                         <div>
                              <h1 className="text-sm font-bold text-text-main">
@@ -610,7 +611,12 @@ export function ChatWindow({
                                             <img
                                                 src="/icono.png"
                                                 alt="Avatar MyFiscal"
-                                                className="absolute inset-0 h-full w-full object-cover"
+                                                className="absolute inset-0 h-full w-full object-cover dark:hidden"
+                                            />
+                                            <img
+                                                src="/icono2.png"
+                                                alt="Avatar MyFiscal"
+                                                className="absolute inset-0 h-full w-full object-cover hidden dark:block"
                                             />
                                             <Loader2 size={16} className="animate-spin text-cyan-main" />
                                         </div>

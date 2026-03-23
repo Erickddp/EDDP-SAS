@@ -46,7 +46,8 @@ export function Header({ user, forceGuestView = false, hasSession = false }: Hea
                         <div className="flex items-center">
                             <Link href="/" className="flex items-center gap-2">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border-glow bg-white dark:bg-bg-sec shadow-sm overflow-hidden p-2">
-                                    <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain" />
+                                    <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain dark:hidden" />
+                                    <img src="/icono2.png" alt="MyFiscal" className="h-full w-full object-contain hidden dark:block" />
                                 </div>
                                 <span className="hidden text-xl font-bold tracking-tight text-text-main sm:block">
                                     MyFiscal

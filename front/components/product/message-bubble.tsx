@@ -132,15 +132,38 @@ export function MessageBubble({
                 >
                     {!isUser && !assistantAvatarUrl && <span className="text-[10px] font-bold text-cyan-main">AI</span>}
                     {isUser && !userAvatarUrl && <span className="text-[10px] font-bold text-text-sec">TU</span>}
-                    <img
-                        src={isUser ? userAvatarUrl : assistantAvatarUrl}
-                        alt={isUser ? "Usuario" : "MyFiscal"}
-                        className={cn("h-full w-full object-contain transition-opacity duration-300", !isUser && "p-0.5")}
-                        loading="lazy"
-                        onError={(event) => {
-                            (event.currentTarget as HTMLImageElement).style.opacity = "0";
-                        }}
-                    />
+                    {isUser ? (
+                        <img
+                            src={userAvatarUrl}
+                            alt="Usuario"
+                            className="h-full w-full object-contain transition-opacity duration-300"
+                            loading="lazy"
+                            onError={(event) => {
+                                (event.currentTarget as HTMLImageElement).style.opacity = "0";
+                            }}
+                        />
+                    ) : (
+                        <>
+                            <img
+                                src={assistantAvatarUrl === "/icono.png" ? "/icono.png" : assistantAvatarUrl}
+                                alt="MyFiscal"
+                                className={cn("h-full w-full object-contain transition-opacity duration-300 p-0.5 dark:hidden")}
+                                loading="lazy"
+                                onError={(event) => {
+                                    (event.currentTarget as HTMLImageElement).style.opacity = "0";
+                                }}
+                            />
+                            <img
+                                src={assistantAvatarUrl === "/icono.png" ? "/icono2.png" : assistantAvatarUrl}
+                                alt="MyFiscal"
+                                className={cn("h-full w-full object-contain transition-opacity duration-300 p-0.5 hidden dark:block")}
+                                loading="lazy"
+                                onError={(event) => {
+                                    (event.currentTarget as HTMLImageElement).style.opacity = "0";
+                                }}
+                            />
+                        </>
+                    )}
                 </div>
 
                 <div className={cn("flex flex-col w-full", isUser ? "items-end" : "items-start")}>

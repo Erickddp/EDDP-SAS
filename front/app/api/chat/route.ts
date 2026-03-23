@@ -17,10 +17,11 @@ import { filterArticlesByRelevance } from "@/lib/article-relevance";
 import { extractArticleFragments } from "@/lib/article-fragment";
 import { rankLegalAuthority, RankedArticle } from "@/lib/legal-authority-ranker";
 import { PlanType, GUEST_LIMIT, PLAN_LIMITS } from "@/lib/saas-constants";
-import { streamText } from "ai";
+import { streamText, type LanguageModel } from "ai";
 import { openaiModel } from "@/lib/openai";
 import { cn, isUuid } from "@/lib/utils";
 
+import { CONFIG } from "@/lib/env-config";
 import { getSubscriptionByUserId, getUserById, getUserByEmail, createUser } from "@/lib/user-storage";
 import { checkUsageLimit, incrementUsage } from "@/lib/usage-enforcer";
 import { logUsage } from "@/lib/observability";
@@ -423,15 +424,28 @@ export async function POST(req: Request) {
             console.log(`│ Authority Ranking: primary=${ranking.primary?.article.id || "none"} supporting=${ranking.supporting.length} rejected=${ranking.rejected.length}`);
         }
 
-        // Determinar estrategia exacta
+        // ──────────────────────────────────────────────────────────────────
+        // 10. Data Stream Generation (AI SDK 3.x+ Compatibility)
+        // ──────────────────────────────────────────────────────────────────
+        
+        // Determinar estrategia exacta para el prompt
         const hasExactMatch = !!parsedRef.lawAbbreviation && !!parsedRef.articleNumber && context.retrievedArticles.length > 0;
-        const retrievalStrategy = hasExactMatch ? 'exact-law-article' : context.retrievalMeta.strategy;
+        const retrievalStrategy = hasExactMatch ? 'exact-law-article' : (context.retrievalMeta?.strategy || "standard");
         const finalRetrievalStrategy = effectiveRetrievalStrategy === "context-aware" ? "context-aware" : retrievalStrategy;
-        const titleSuggestion = "Consulta Fiscal"; // Fallback or logic to generate
+        const titleSuggestion = (body.history?.length === 0) ? "Consulta Fiscal" : "Consulta";
 
-        // ──────────────────────────────────────────────────────────────────
-        // 10. Final Stream Generation (Phase 10: Vercel AI SDK)
-        // ──────────────────────────────────────────────────────────────────
+        // Validate API Key
+        if (!CONFIG.OPENAI_API_KEY) {
+            console.error("[OPENAI_CRITICAL_DEBUG] Missing OPENAI_API_KEY in environment!");
+            return handleApiError(new Error("Servicio de inteligencia no configurado"), AppErrorType.OPENAI);
+        }
+
+        // Manual Protocol v1 implementation for AI SDK v6 compatibility
+        const metadata = { 
+            sources: context.sources, 
+            titleSuggestion: (body.history?.length === 0) ? titleSuggestion : null 
+        };
+
         const result = streamText({
             model: openaiModel(OPENAI_MODEL),
             messages: [
@@ -471,28 +485,11 @@ export async function POST(req: Request) {
             ],
             temperature: 0.2,
             onFinish: async (completion) => {
-                // Post-stream side effects
                 const finishTime = Date.now();
                 const duration = finishTime - startTime;
 
                 try {
-                    // Try to parse structured answer from completion if it's JSON
-                    let answer: StructuredAnswer;
-                    try {
-                        answer = JSON.parse(completion.text);
-                    } catch (e) {
-                         // Fallback for non-JSON streams or partial failures
-                         answer = {
-                            summary: completion.text,
-                            foundation: [],
-                            scenarios: [],
-                            consequences: [],
-                            certainty: "Análisis en vivo",
-                            disclaimer: "Respuesta en streaming."
-                         } as any;
-                    }
-
-                    // Update conversation memory
+                    // Update memory & increment usage
                     updateConversationContext(
                         body.conversationId,
                         context.topic,
@@ -503,7 +500,6 @@ export async function POST(req: Request) {
                         body.message
                     );
 
-                    // SaaS: Usage Tracking
                     if (!isGuest) await incrementUsage(userId);
                     
                     await logUsage({
@@ -517,8 +513,15 @@ export async function POST(req: Request) {
                         ipAddress: clientIp
                     });
 
-                    // Database Persistence
+                    // Persist to DB
                     if (userId !== "unknown") {
+                        let savedContent = completion.text;
+                        try {
+                            if (savedContent.trim().startsWith('{')) {
+                                savedContent = JSON.parse(savedContent);
+                            }
+                        } catch(e) {}
+
                         await saveConversation(userId, {
                             id: body.conversationId,
                             title: (body.history?.length === 0) ? (titleSuggestion as string) : "Consulta Fiscal",
@@ -536,32 +539,37 @@ export async function POST(req: Request) {
                             content: body.message,
                             createdAt: Date.now()
                         });
-
-                        await saveChatMsg({
-                            id: `asst-${Date.now()}`,
-                            conversationId: body.conversationId,
-                            role: "assistant",
-                            content: answer,
-                            sources: context.sources,
-                            createdAt: Date.now()
-                        });
                     }
-
-                    // Cache (non-follow-ups)
-                    if (!followUpResult.isFollowUp) {
-                        await setCachedResponse(body.message, { answer, sources: context.sources }, userContext?.professionalProfile || "entrepreneur");
-                    }
-                    
                 } catch (err) {
-                    console.error("Error in onFinish stream logic:", err);
+                    console.error("Error in onFinish side-effects:", err);
                 }
             }
         });
 
-        return result.toTextStreamResponse();
+        const prefixedStream = (result.textStream as any).pipeThrough(
+            new TransformStream({
+                transform(chunk: string, controller: TransformStreamDefaultController) {
+                    if (chunk) {
+                        controller.enqueue(`0:${JSON.stringify(chunk)}\n`);
+                    }
+                },
+                flush(controller: TransformStreamDefaultController) {
+                    // Send metadata as data chunk 'd:'
+                    controller.enqueue(`d:${JSON.stringify(metadata)}\n`);
+                }
+            })
+        );
+
+        return new Response(prefixedStream, {
+            headers: {
+                "Content-Type": "text/plain; charset=utf-8",
+                "x-vercel-ai-data-stream": "v1"
+            }
+        });
 
     } catch (error: unknown) {
         const err = error as Error;
+        console.error("[OPENAI_CRITICAL_DEBUG] Final Pipeline crash:", err.message, err.stack);
         // Observability logging
         await logUsage({
             userId,

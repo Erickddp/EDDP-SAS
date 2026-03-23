@@ -49,14 +49,16 @@ export function Sidebar({
                 {isOpen && (
                     <Link href="/" className="flex items-center gap-2 px-2">
                         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white dark:bg-bg-sec border border-border-glow shadow-sm overflow-hidden p-1.5">
-                            <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain" />
+                            <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain dark:hidden" />
+                            <img src="/icono2.png" alt="MyFiscal" className="h-full w-full object-contain hidden dark:block" />
                         </div>
                         <span className="text-lg font-bold text-text-main">MyFiscal</span>
                     </Link>
                 )}
                 {!isOpen && (
                     <Link href="/" className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-white dark:bg-bg-sec border border-border-glow shadow-sm hover:border-cyan-main/30 transition-all overflow-hidden p-1.5">
-                        <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain" />
+                        <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain dark:hidden" />
+                        <img src="/icono2.png" alt="MyFiscal" className="h-full w-full object-contain hidden dark:block" />
                     </Link>
                 )}
                 {onToggle && isOpen && (

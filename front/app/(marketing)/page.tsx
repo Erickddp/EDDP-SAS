@@ -33,7 +33,8 @@ export default async function MarketingPage() {
                 <div className="container mx-auto max-w-7xl px-4 flex flex-col md:flex-row justify-between items-center gap-6">
                     <div className="flex items-center gap-2">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border-glow bg-white dark:bg-bg-sec shadow-sm overflow-hidden p-1.5">
-                            <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain" />
+                            <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain dark:hidden" />
+                            <img src="/icono2.png" alt="MyFiscal" className="h-full w-full object-contain hidden dark:block" />
                         </div>
                         <span className="text-lg font-bold tracking-tight text-text-main">
                             MyFiscal
