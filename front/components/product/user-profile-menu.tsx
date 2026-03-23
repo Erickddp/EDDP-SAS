@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { 
-    Settings, 
-    LogOut, 
-    User, 
-    Shield, 
-    FileText, 
+import { useEffect, useRef, useState } from "react";
+import {
+    Settings,
+    LogOut,
+    Shield,
+    FileText,
     ChevronUp,
-    Sparkles,
-    CreditCard
+    Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserSession } from "@/lib/session";
@@ -18,19 +16,30 @@ import Link from "next/link";
 interface UserProfileMenuProps {
     user: UserSession | null;
     isCollapsed?: boolean;
+    triggerVariant?: "avatar" | "settings";
+    menuPlacement?: "top" | "right" | "bottom-right";
+    className?: string;
+    buttonClassName?: string;
 }
 
-export function UserProfileMenu({ user, isCollapsed = false }: UserProfileMenuProps) {
+export function UserProfileMenu({
+    user,
+    isCollapsed = false,
+    triggerVariant = "settings",
+    menuPlacement = "top",
+    className,
+    buttonClassName
+}: UserProfileMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    // Close on click outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
         };
+
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
@@ -39,87 +48,125 @@ export function UserProfileMenu({ user, isCollapsed = false }: UserProfileMenuPr
 
     const avatarUrl = user.googleAvatarUrl || user.avatarUrl || "";
     const initials = user.name ? user.name.slice(0, 2).toUpperCase() : "US";
+    const isAvatarTrigger = triggerVariant === "avatar";
+
+    const menuPositionClass = (() => {
+        if (menuPlacement === "bottom-right") {
+            return "right-0 top-full mt-2";
+        }
+
+        if (menuPlacement === "right") {
+            return "left-12 bottom-0";
+        }
+
+        return isCollapsed ? "left-12 bottom-0 mb-0" : "bottom-full left-0 mb-2";
+    })();
 
     return (
-        <div className="relative w-full" ref={menuRef}>
-            {/* Dropdown Menu */}
+        <div className={cn("relative", isAvatarTrigger ? "w-auto" : "w-full", className)} ref={menuRef}>
             {isOpen && (
-                <div className={cn(
-                    "absolute bottom-full left-0 mb-2 w-64 rounded-2xl bg-bg-card border border-border-glow shadow-2xl backdrop-blur-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200 overflow-hidden",
-                    isCollapsed ? "left-12 bottom-0 mb-0" : ""
-                )}>
-                    <div className="p-3 border-b border-border-glow/50 bg-cyan-main/5">
+                <div
+                    className={cn(
+                        "absolute z-50 w-64 overflow-hidden rounded-2xl border border-border-glow bg-bg-card shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200",
+                        menuPositionClass
+                    )}
+                >
+                    <div className="border-b border-border-glow/50 bg-cyan-main/5 p-3">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl border border-cyan-main/30 bg-bg-sec overflow-hidden shrink-0">
+                            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-cyan-main/30 bg-bg-sec">
                                 {avatarUrl ? (
                                     <img src={avatarUrl} alt={user.name} className="h-full w-full object-cover" />
                                 ) : (
-                                    <div className="h-full w-full flex items-center justify-center text-xs font-bold text-cyan-main">
+                                    <div className="flex h-full w-full items-center justify-center text-xs font-bold text-cyan-main">
                                         {initials}
                                     </div>
                                 )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-text-main truncate">{user.name}</p>
-                                <p className="text-[10px] text-text-sec truncate opacity-70">{user.email}</p>
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-bold text-text-main">{user.name}</p>
+                                <p className="truncate text-[10px] text-text-sec opacity-70">{user.email}</p>
                             </div>
                         </div>
                     </div>
 
                     <div className="p-1.5">
                         <MenuItem icon={<Settings size={14} />} label="Ajustes" href="/account" />
-                        {user.plan === 'gratis' && (
-                             <MenuItem 
-                                icon={<Sparkles size={14} className="text-cyan-main" />} 
-                                label="Subir a Pro" 
-                                href="/pricing" 
-                                className="text-cyan-main font-bold"
-                             />
+                        {user.plan === "gratis" && (
+                            <MenuItem
+                                icon={<Sparkles size={14} className="text-cyan-main" />}
+                                label="Subir a Pro"
+                                href="/pricing"
+                                className="font-bold text-cyan-main"
+                            />
                         )}
-                        <div className="h-px bg-border-glow/30 my-1 mx-2" />
+                        <div className="mx-2 my-1 h-px bg-border-glow/30" />
                         <MenuItem icon={<Shield size={14} />} label="Privacidad" href="/privacy" />
-                        <MenuItem icon={<FileText size={14} />} label="Términos" href="/terms" />
-                        <div className="h-px bg-border-glow/30 my-1 mx-2" />
-                        <button 
-                            onClick={() => window.location.href = '/api/auth/logout'}
-                            className="flex w-full items-center gap-3 px-3 py-2 rounded-xl text-sm text-red-400 hover:bg-red-400/10 transition-colors"
+                        <MenuItem icon={<FileText size={14} />} label="Terminos" href="/terms" />
+                        <div className="mx-2 my-1 h-px bg-border-glow/30" />
+                        <button
+                            onClick={() => { window.location.href = "/api/auth/logout"; }}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-400 transition-colors hover:bg-red-400/10"
                         >
                             <LogOut size={14} />
-                            <span>Cerrar Sesión</span>
+                            <span>Cerrar Sesion</span>
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Main Button */}
             <button
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => setIsOpen((current) => !current)}
                 className={cn(
-                    "flex w-full items-center gap-3 rounded-2xl p-2 transition-all group",
-                    isOpen ? "bg-bg-sec/80 ring-1 ring-border-glow shadow-md" : "hover:bg-bg-sec/50",
-                    isCollapsed ? "justify-center" : "px-3"
+                    "group transition-all",
+                    isAvatarTrigger
+                        ? "inline-flex items-center justify-center"
+                        : "flex w-full items-center gap-3 rounded-2xl p-2",
+                    !isAvatarTrigger && (isOpen ? "bg-bg-sec/80 ring-1 ring-border-glow shadow-md" : "hover:bg-bg-sec/50"),
+                    !isAvatarTrigger && !isCollapsed ? "px-3" : "",
+                    !isAvatarTrigger && isCollapsed ? "justify-center" : "",
+                    buttonClassName
                 )}
+                aria-label={isAvatarTrigger ? "Abrir menu de cuenta" : "Abrir ajustes y cuenta"}
+                title={isAvatarTrigger ? "Cuenta" : "Ajustes y cuenta"}
             >
-                <div className={cn(
-                    "h-9 w-9 rounded-xl border border-border-glow bg-white dark:bg-bg-sec overflow-hidden shrink-0 transition-transform group-hover:scale-105 shadow-sm",
-                    isOpen ? "border-cyan-main/30 ring-1 ring-cyan-main/20" : ""
-                )}>
-                    {avatarUrl ? (
-                        <img src={avatarUrl} alt={user.name} className="h-full w-full object-cover" />
-                    ) : (
-                        <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-cyan-main">
-                            {initials}
-                        </div>
-                    )}
-                </div>
-                
-                {!isCollapsed && (
+                {isAvatarTrigger ? (
+                    <div className="h-10 w-10 overflow-hidden rounded-full border border-border-glow bg-bg-sec shadow-lg transition-transform group-hover:scale-105 md:h-11 md:w-11">
+                        {avatarUrl ? (
+                            <img src={avatarUrl} alt={user.name} className="h-full w-full object-cover" />
+                        ) : (
+                            <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-cyan-main">
+                                {initials}
+                            </div>
+                        )}
+                    </div>
+                ) : (
                     <>
-                        <div className="flex-1 text-left min-w-0">
-                            <p className="text-xs font-bold text-text-main truncate">{user.name}</p>
-                            <p className="text-[10px] text-text-sec truncate opacity-60">Plan {user.plan}</p>
+                        <div
+                            className={cn(
+                                "relative flex shrink-0 items-center justify-center rounded-xl border border-border-glow bg-white text-text-sec shadow-sm transition-all group-hover:scale-105 group-hover:text-text-main dark:bg-bg-sec",
+                                isCollapsed ? "h-10 w-10" : "h-9 w-9",
+                                isOpen ? "border-cyan-main/30 text-cyan-main ring-1 ring-cyan-main/20" : ""
+                            )}
+                        >
+                            <Settings size={isCollapsed ? 18 : 17} />
+                            <span
+                                className={cn(
+                                    "absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-bg-sec bg-cyan-main transition-opacity",
+                                    isOpen ? "opacity-100" : "opacity-70"
+                                )}
+                                aria-hidden="true"
+                            />
                         </div>
-                        <ChevronUp size={14} className={cn("text-text-sec transition-transform duration-200", isOpen ? "rotate-180" : "")} />
+
+                        {!isCollapsed && (
+                            <>
+                                <div className="min-w-0 flex-1 text-left">
+                                    <p className="truncate text-xs font-bold text-text-main">Ajustes</p>
+                                    <p className="truncate text-[10px] text-text-sec opacity-60">Cuenta y preferencias</p>
+                                </div>
+                                <ChevronUp size={14} className={cn("text-text-sec transition-transform duration-200", isOpen ? "rotate-180" : "")} />
+                            </>
+                        )}
                     </>
                 )}
             </button>
@@ -127,12 +174,22 @@ export function UserProfileMenu({ user, isCollapsed = false }: UserProfileMenuPr
     );
 }
 
-function MenuItem({ icon, label, href, className }: { icon: React.ReactNode, label: string, href: string, className?: string }) {
+function MenuItem({
+    icon,
+    label,
+    href,
+    className
+}: {
+    icon: React.ReactNode;
+    label: string;
+    href: string;
+    className?: string;
+}) {
     return (
-        <Link 
-            href={href} 
+        <Link
+            href={href}
             className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-text-sec hover:text-text-main hover:bg-bg-sec transition-all",
+                "flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-text-sec transition-all hover:bg-bg-sec hover:text-text-main",
                 className
             )}
         >

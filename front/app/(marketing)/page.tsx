@@ -1,13 +1,8 @@
 import { Header } from "@/components/layout/header";
-import { Hero } from "@/components/marketing/hero";
-import { HowItWorks } from "@/components/marketing/how-it-works";
-import { Benefits } from "@/components/marketing/benefits";
-import { UseCases } from "@/components/marketing/use-cases";
-import { PricingPreview } from "@/components/marketing/pricing-preview";
-import { LegalDisclaimer } from "@/components/marketing/legal-disclaimer";
-import { FAQ } from "@/components/marketing/faq";
-import { Waitlist } from "@/components/marketing/waitlist";
-import { FinalCTA } from "@/components/marketing/final-cta";
+import { HeroArea } from "@/components/marketing/hero-area";
+import { ValueStorytelling } from "@/components/marketing/value-storytelling";
+import { PricingMatrix } from "@/components/marketing/pricing-matrix";
+import { TrustSection } from "@/components/marketing/trust-section";
 import { getSession } from "@/lib/session";
 import Link from "next/link";
 
@@ -19,15 +14,10 @@ export default async function MarketingPage() {
         <>
             <Header user={user} forceGuestView hasSession={hasSession} />
             <main className="flex-1 relative w-full">
-                <Hero user={user} forceGuestView hasSession={hasSession} />
-                <HowItWorks />
-                <Benefits />
-                <UseCases />
-                <PricingPreview hasSession={hasSession} />
-                <FAQ />
-                <Waitlist />
-                <FinalCTA hasSession={hasSession} />
-                <LegalDisclaimer />
+                <HeroArea hasSession={hasSession} />
+                <ValueStorytelling />
+                <PricingMatrix hasSession={hasSession} />
+                <TrustSection />
             </main>
             <footer className="border-t border-border-glow bg-bg-main py-10 text-center text-sm text-text-sec z-10 relative">
                 <div className="container mx-auto max-w-7xl px-4 flex flex-col md:flex-row justify-between items-center gap-6">

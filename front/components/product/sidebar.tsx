@@ -50,8 +50,8 @@ export function Sidebar({
                         isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
                     )
                     : cn(
-                        "relative z-20 flex-col",
-                        isOpen ? "flex w-72" : "hidden w-0 md:flex md:w-20"
+                        "relative z-20 hidden overflow-hidden md:flex md:flex-col",
+                        isOpen ? "md:w-72 md:opacity-100" : "md:w-0 md:opacity-0 md:pointer-events-none"
                     )
             )}
         >
@@ -73,10 +73,7 @@ export function Sidebar({
                 {onToggle && (
                     <button
                         onClick={onToggle}
-                        className={cn(
-                            "text-text-sec hover:text-text-main p-1.5 transition-all rounded-lg hover:bg-bg-sec/80",
-                            !isOpen && "hidden" // Keep sidebar button hidden when collapsed in mobile if needed, or always show if space allows
-                        )}
+                        className="rounded-lg p-1.5 text-text-sec transition-all hover:bg-bg-sec/80 hover:text-text-main"
                         aria-label={isOpen ? "Cerrar barra lateral" : "Abrir barra lateral"}
                     >
                         {isOpen && <PanelLeftClose size={18} />}
@@ -176,7 +173,10 @@ export function Sidebar({
                         >
                             <button
                                 onClick={() => onSelect?.(conv.id)}
-                                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                                className={cn(
+                                    "flex min-w-0 items-center gap-3 text-left",
+                                    isOpen ? "flex-1" : "h-10 w-10 justify-center"
+                                )}
                             >
                                 <MessageSquare size={16} className={cn(
                                     "shrink-0",
@@ -243,7 +243,12 @@ export function Sidebar({
                 )}
 
                 {/* Identity Hub */}
-                <UserProfileMenu user={user || null} isCollapsed={!isOpen} />
+                <UserProfileMenu
+                    user={user || null}
+                    isCollapsed={!isOpen}
+                    triggerVariant="settings"
+                    menuPlacement={!isOpen ? "right" : "top"}
+                />
             </div>
         </aside>
     );

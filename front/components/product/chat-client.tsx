@@ -210,6 +210,7 @@ export function ChatClient({ initialSession }: ChatClientProps) {
                     user={initialSession}
                     onOpenSidebar={() => setSidebarOpen(true)}
                     isMobile={isMobile}
+                    isSidebarOpen={sidebarOpen}
                 />
             </div>
         </>

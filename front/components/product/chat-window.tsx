@@ -14,6 +14,7 @@ import { ArticleViewer } from "./article-viewer";
 import { USER_AVATAR_OPTIONS, resolveEffectiveAvatar } from "@/lib/avatar-options";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { ProfileSettingsModal } from "./profile-settings-modal";
+import { UserProfileMenu } from "./user-profile-menu";
 
 interface ChatWindowProps {
     conversationId: string | null;
@@ -28,6 +29,7 @@ interface ChatWindowProps {
     user?: import("@/lib/session").UserSession | null;
     onOpenSidebar?: () => void;
     isMobile?: boolean;
+    isSidebarOpen?: boolean;
 }
 
 interface SessionAvatarResponse {
@@ -65,6 +67,7 @@ export function ChatWindow({
     user,
     onOpenSidebar,
     isMobile,
+    isSidebarOpen = true,
 }: ChatWindowProps) {
     const [mode, setMode] = useState<ChatMode>(initialMode);
     const [detail, setDetail] = useState<DetailLevel>(initialDetailLevel);
@@ -453,14 +456,15 @@ export function ChatWindow({
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
                     <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-start gap-3">
-                            {isMobile && onOpenSidebar && (
+                            {onOpenSidebar && (isMobile || !isSidebarOpen) && (
                                 <button
                                     type="button"
                                     onClick={onOpenSidebar}
-                                    className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border-glow bg-bg-sec text-text-sec shadow-sm transition-all hover:border-cyan-main/30 hover:text-text-main md:hidden"
-                                    aria-label="Abrir historial"
+                                    className="mt-0.5 inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-border-glow bg-bg-sec px-3 text-text-sec shadow-sm transition-all hover:border-cyan-main/30 hover:text-text-main"
+                                    aria-label="Abrir barra lateral"
                                 >
                                     <PanelLeft size={18} />
+                                    {!isMobile && <span className="hidden text-sm font-medium md:inline">Historial</span>}
                                 </button>
                             )}
                             <div className="min-w-0">
@@ -495,11 +499,19 @@ export function ChatWindow({
                                 </button>
                             )}
                             <ThemeToggle compact={!!isMobile} />
-                            <img
-                                src={effectiveUserAvatar}
-                                alt="Avatar"
-                                className="h-10 w-10 rounded-full border border-border-glow object-cover shadow-lg md:h-11 md:w-11"
-                            />
+                            {user ? (
+                                <UserProfileMenu
+                                    user={user}
+                                    triggerVariant="avatar"
+                                    menuPlacement="bottom-right"
+                                />
+                            ) : (
+                                <img
+                                    src={effectiveUserAvatar}
+                                    alt="Avatar"
+                                    className="h-10 w-10 rounded-full border border-border-glow object-cover shadow-lg md:h-11 md:w-11"
+                                />
+                            )}
                         </div>
                     </div>
                 </div>
