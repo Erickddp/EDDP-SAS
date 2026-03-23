@@ -17,6 +17,7 @@ export interface UserSession {
   plan: PlanType;
   professionalProfile?: string | null;
   subscriptionStatus: "active" | "canceled" | "past_due" | "none";
+  isProfileComplete?: boolean;
   questionCount?: number; // Phase 8: Guest limit
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { parsePartialJson } from "ai";
 import { ChatControls } from "./chat-controls";
 
 import { PromptSuggestions } from "./prompt-suggestions";
@@ -15,11 +16,14 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 interface ChatWindowProps {
     conversationId: string | null;
-    onUpdateTitle: (title: string) => void;
+    onUpdateMetadata: (title?: string, tags?: string[]) => void;
     onNewConversation: () => void;
     initialMode: ChatMode;
     initialDetailLevel: DetailLevel;
     onPrefsChange: (mode: ChatMode, level: DetailLevel) => void;
+    onFirstMessage?: () => void;
+    conversationTitle?: string;
+    conversationTags?: string[];
     user?: import("@/lib/session").UserSession | null;
 }
 
@@ -46,12 +50,15 @@ function getLatestExchange(messages: Message[]): Message[] {
 
 export function ChatWindow({
     conversationId,
-    onUpdateTitle,
+    onUpdateMetadata,
     onNewConversation,
     initialMode,
     initialDetailLevel,
     onPrefsChange,
-    user
+    onFirstMessage,
+    conversationTitle,
+    conversationTags,
+    user,
 }: ChatWindowProps) {
     const [mode, setMode] = useState<ChatMode>(initialMode);
     const [detail, setDetail] = useState<DetailLevel>(initialDetailLevel);
@@ -259,6 +266,11 @@ export function ChatWindow({
                 throw new Error(errorData.message || "Error en la respuesta del asistente");
             }
 
+            // Call first message callback if this was a new chat
+            if (messages.length === 0 && onFirstMessage) {
+                onFirstMessage();
+            }
+
             // Create placeholder for assistant message
             const assistantMessageId = (Date.now() + 1).toString();
             const assistantMessage: Message = {
@@ -292,10 +304,23 @@ export function ChatWindow({
                                 const textPart = JSON.parse(line.substring(2));
                                 fullText += textPart;
                                 
+                                // Live parsing for structured answers (Level: Técnica)
+                                let displayContent: string | StructuredAnswer = fullText;
+                                if (fullText.trim().startsWith('{')) {
+                                    try {
+                                        const result = await parsePartialJson(fullText);
+                                        if (result.value && typeof result.value === 'object') {
+                                            displayContent = result.value as unknown as StructuredAnswer;
+                                        }
+                                    } catch (e) {
+                                        // Still a raw string while parsing fails
+                                    }
+                                }
+
                                 // Update message in UI
                                 setMessages(prev => prev.map(m => 
                                     m.id === assistantMessageId 
-                                        ? { ...m, content: fullText } 
+                                        ? { ...m, content: displayContent } 
                                         : m
                                 ));
                             } else if (line.startsWith('d:')) { // Data chunk (metadata)
@@ -331,9 +356,12 @@ export function ChatWindow({
 
             Storage.saveMessage(updatedAssistantMessage);
 
-            // Handle title suggestion
-            if (metadata.titleSuggestion && messages.length === 0) {
-                onUpdateTitle(metadata.titleSuggestion);
+            // Handle metadata updates (tags always, title only if it's the first message)
+            if (metadata.tags || (metadata.titleSuggestion && messages.length === 0)) {
+                onUpdateMetadata(
+                    messages.length === 0 ? metadata.titleSuggestion : undefined,
+                    metadata.tags
+                );
             }
 
         } catch (error) {
@@ -484,12 +512,22 @@ export function ChatWindow({
                             <img src="/icono2.png" alt="MyFiscal" className="w-full h-full object-contain hidden dark:block" />
                         </div>
                         <div>
-                             <h1 className="text-sm font-bold text-text-main">
-                                {profile.role === 'guest' ? `Invitado (${profile.questionCount}/5)` : (user?.name || 'Consulta Fiscal')}
+                             <h1 className="text-sm font-bold text-text-main truncate max-w-[200px]">
+                                {conversationTitle || (profile.role === 'guest' ? `Invitado (${profile.questionCount}/5)` : 'Nueva consulta')}
                             </h1>
-                            <p className="text-[10px] text-text-sec uppercase tracking-widest opacity-60">
-                                {profile.role === 'guest' ? 'Límite de Prueba (5 cons.)' : (profile.professionalProfile ? 'Análisis Especializado' : 'Motor de análisis v1.0')}
-                            </p>
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                                {conversationTags && conversationTags.length > 0 ? (
+                                    conversationTags.map((tag, i) => (
+                                        <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-md bg-cyan-main/10 text-cyan-main border border-cyan-main/20 uppercase font-bold tracking-tighter">
+                                            {tag}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <p className="text-[9px] text-text-sec uppercase tracking-widest opacity-60">
+                                        {profile.role === 'guest' ? 'Límite de Prueba' : 'Análisis Fiscal'}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -507,32 +545,12 @@ export function ChatWindow({
                              </button>
                         )}
                         <ThemeToggle />
-                        <div className="flex items-center gap-2 rounded-xl border border-border-glow bg-bg-sec/80 px-2 py-1">
+                        <div className="flex items-center gap-1.5">
                             <img
                                 src={effectiveUserAvatar}
-                                alt="Avatar de usuario"
-                                className="h-6 w-6 rounded-full border border-border-glow object-cover"
+                                alt="Avatar"
+                                className="h-10 w-10 md:h-12 md:w-12 rounded-full border border-border-glow object-cover shadow-lg"
                             />
-                            {isAvatarLockedByGoogle ? (
-                                <span className="text-[11px] text-text-sec">Avatar Google</span>
-                            ) : (
-                                <label className="flex items-center gap-1">
-                                    <UserCircle2 size={14} className="text-text-sec" />
-                                    <select
-                                        value={USER_AVATAR_OPTIONS.some((option) => option.src === profile.avatarUrl) ? profile.avatarUrl : USER_AVATAR_OPTIONS[0].src}
-                                        onChange={(event) => handleAvatarChange(event.target.value)}
-                                        disabled={isAvatarSaving}
-                                        className="bg-transparent text-[11px] text-text-main outline-none"
-                                        aria-label="Seleccionar avatar de perfil"
-                                    >
-                                        {USER_AVATAR_OPTIONS.map((option) => (
-                                            <option key={option.id} value={option.src} className="bg-bg-main text-text-main">
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                            )}
                         </div>
                     </div>
                 </div>

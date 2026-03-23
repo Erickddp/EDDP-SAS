@@ -443,7 +443,8 @@ export async function POST(req: Request) {
         // Manual Protocol v1 implementation for AI SDK v6 compatibility
         const metadata = { 
             sources: context.sources, 
-            titleSuggestion: (body.history?.length === 0) ? titleSuggestion : null 
+            titleSuggestion: (body.history?.length === 0) ? titleSuggestion : null,
+            tags: queryDebug.matchedKeywords?.slice(0, 3) || [queryAnalysis.detectedIntent]
         };
 
         const result = streamText({

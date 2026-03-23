@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquare, Plus, PanelLeftClose, CheckCircle2, Archive, ArchiveRestore, Trash2, ChevronRight, ChevronDown } from "lucide-react";
+import { MessageSquare, Plus, PanelLeftClose, CheckCircle2, Archive, ArchiveRestore, Trash2, ChevronRight, ChevronDown, ChevronsLeft, Menu } from "lucide-react";
+import { UserProfileMenu } from "./user-profile-menu";
 import { Button } from "../ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -193,49 +194,46 @@ export function Sidebar({
                 </nav>
             </div>
 
-            <div className={cn("mt-auto border-t border-border-glow p-4", !isOpen ? "hidden md:flex justify-center" : "")}>
-                <div className={cn(
-                    "rounded-xl border border-cyan-main/20 bg-cyan-main/5 relative overflow-hidden transition-all duration-300",
-                    isOpen ? "p-4" : "p-2 opacity-70 hover:opacity-100 flex justify-center w-full cursor-pointer"
-                )}>
-                    {isOpen && (
-                        <>
-                            <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-main/10 blur-xl rounded-full" aria-hidden="true" />
-                            <div className="text-[10px] font-bold text-cyan-main mb-1 uppercase tracking-widest opacity-80">Edición Beta</div>
-                            <h4 className="text-base font-bold text-text-main mb-3">
-                                {user && user.role !== 'guest' ? `Plan ${user.plan}` : 'Acceso Gratuito'}
-                            </h4>
-                            {user && user.role !== 'guest' ? (
-                                <p className="text-[10px] text-text-sec leading-relaxed">
-                                    Historial sincronizado y sin límites de prueba.
-                                </p>
-                            ) : (
-                                <>
-                                    <p className="text-[10px] text-text-sec mb-3 leading-relaxed">
-                                        Límite de 5 consultas para invitados. Regístrate para acceso ilimitado.
-                                    </p>
-                                    <Link href="/register" className="w-full">
-                                        <Button
-                                            variant={joinedPro ? "outline" : "primary"}
-                                            size="sm"
-                                            className={cn(
-                                                "w-full text-xs h-8 shadow-sm transition-all",
-                                                joinedPro ? "bg-green-400/10 border-green-400/30 text-green-400 hover:bg-green-400/20" : ""
-                                            )}
-                                        >
-                                            {joinedPro ? (
-                                                <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> ¡Anotado!</span>
-                                            ) : "Registrarse Gratis"}
-                                        </Button>
-                                    </Link>
-                                </>
-                            )}
-                        </>
-                    )}
-                    {!isOpen && (
-                        <div className="text-[10px] font-bold text-cyan-main text-center">BETA</div>
-                    )}
-                </div>
+            <div className={cn("mt-auto border-t border-border-glow flex flex-col gap-2 transition-all p-3", !isOpen ? "items-center" : "")}>
+                {/* Subscription Banner (Conditional) */}
+                {(!user || user.plan === 'gratis') && (
+                    <div className={cn(
+                        "rounded-xl border border-cyan-main/20 bg-cyan-main/5 relative overflow-hidden transition-all duration-300",
+                        isOpen ? "p-4" : "h-1 w-full bg-cyan-main/10 border-none p-0 overflow-hidden opacity-30"
+                    )}>
+                        {isOpen && (
+                            <>
+                                <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-main/10 blur-xl rounded-full" aria-hidden="true" />
+                                <div className="text-[10px] font-bold text-cyan-main mb-1 uppercase tracking-widest opacity-80">Edición Beta</div>
+                                <h4 className="text-sm font-bold text-text-main mb-2">
+                                    {user && user.role !== 'guest' ? `Plan ${user.plan}` : 'Acceso Gratuito'}
+                                </h4>
+                                {(!user || user.role === 'guest') && (
+                                    <>
+                                        <p className="text-[10px] text-text-sec mb-3 leading-relaxed">
+                                            Límite de 5 consultas. Regístrate para acceso ilimitado.
+                                        </p>
+                                        <Link href="/register" className="w-full">
+                                            <Button
+                                                variant={joinedPro ? "outline" : "primary"}
+                                                size="sm"
+                                                className={cn(
+                                                    "w-full text-[10px] h-7 shadow-sm transition-all uppercase font-black tracking-tighter",
+                                                    joinedPro ? "bg-green-400/10 border-green-400/30 text-green-400" : ""
+                                                )}
+                                            >
+                                                Registrarse Gratis
+                                            </Button>
+                                        </Link>
+                                    </>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* Identity Hub */}
+                <UserProfileMenu user={user || null} isCollapsed={!isOpen} />
             </div>
         </aside>
     );

@@ -12,6 +12,7 @@ export async function getUserConversations(userId: string): Promise<Conversation
         mode: r.mode,
         detailLevel: r.detail_level,
         archived: r.archived,
+        tags: r.tags || [],
         createdAt: r.created_at.getTime(),
         updatedAt: r.updated_at.getTime()
     }));
@@ -34,15 +35,16 @@ export async function getConversationMessages(conversationId: string): Promise<M
 
 export async function saveConversation(userId: string, conversation: Conversation): Promise<void> {
     await query(
-        `INSERT INTO conversations (id, user_id, title, mode, detail_level, archived, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        `INSERT INTO conversations (id, user_id, title, mode, detail_level, archived, tags, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
          ON CONFLICT (id) DO UPDATE SET 
             title = EXCLUDED.title, 
             mode = EXCLUDED.mode, 
             detail_level = EXCLUDED.detail_level,
             archived = EXCLUDED.archived,
+            tags = EXCLUDED.tags,
             updated_at = NOW()`,
-        [conversation.id, userId, conversation.title, conversation.mode, conversation.detailLevel, conversation.archived || false]
+        [conversation.id, userId, conversation.title, conversation.mode, conversation.detailLevel, conversation.archived || false, conversation.tags || []]
     );
 }
 

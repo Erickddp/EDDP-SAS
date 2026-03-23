@@ -102,10 +102,15 @@ export function ChatClient({ initialSession }: ChatClientProps) {
         }
     };
 
-    const handleUpdateTitle = (newTitle: string) => {
+    const handleUpdateMetadata = (newTitle?: string, newTags?: string[]) => {
         if (!activeId) return;
         const updated = conversations.map(c =>
-            c.id === activeId ? { ...c, title: newTitle, updatedAt: Date.now() } : c
+            c.id === activeId ? { 
+                ...c, 
+                title: newTitle ?? c.title, 
+                tags: newTags ?? c.tags,
+                updatedAt: Date.now() 
+            } : c
         );
         setConversations(updated);
         Storage.saveConversations(updated);
@@ -180,12 +185,15 @@ export function ChatClient({ initialSession }: ChatClientProps) {
             <div className="flex-1 min-w-0 flex flex-col relative z-10 w-full h-[100dvh]">
                 <ChatWindow
                     conversationId={activeId}
-                    onUpdateTitle={handleUpdateTitle}
+                    onUpdateMetadata={handleUpdateMetadata}
                     onNewConversation={handleNewConversation}
                     initialMode={prefs.lastMode}
                     initialDetailLevel={prefs.lastDetailLevel}
                     onPrefsChange={handlePrefsChange}
-                    user={initialSession} // Pass user to ChatWindow
+                    onFirstMessage={() => setSidebarOpen(false)}
+                    conversationTitle={activeId ? conversations.find(c => c.id === activeId)?.title : undefined}
+                    conversationTags={activeId ? conversations.find(c => c.id === activeId)?.tags : undefined}
+                    user={initialSession}
                 />
             </div>
 

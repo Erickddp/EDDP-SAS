@@ -143,6 +143,7 @@ export interface Conversation {
     mode: ChatMode;
     detailLevel: DetailLevel;
     archived?: boolean;
+    tags?: string[];
     createdAt: number;
     updatedAt: number;
 }
