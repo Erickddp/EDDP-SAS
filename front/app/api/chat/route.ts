@@ -19,10 +19,9 @@ import { rankLegalAuthority, RankedArticle } from "@/lib/legal-authority-ranker"
 import { PlanType, GUEST_LIMIT, PLAN_LIMITS } from "@/lib/saas-constants";
 import { streamText } from "ai";
 import { openaiModel } from "@/lib/openai";
+import { cn, isUuid } from "@/lib/utils";
 
-
-
-import { getSubscriptionByUserId, getUserById } from "@/lib/user-storage";
+import { getSubscriptionByUserId, getUserById, getUserByEmail, createUser } from "@/lib/user-storage";
 import { checkUsageLimit, incrementUsage } from "@/lib/usage-enforcer";
 import { logUsage } from "@/lib/observability";
 import { handleApiError, AppErrorType, validatedMethod } from "@/lib/error-handler";
@@ -113,6 +112,39 @@ export async function POST(req: Request) {
                 code: "GUEST_LIMIT_REACHED",
                 message: `Has alcanzado el límite de ${GUEST_LIMIT} consultas como invitado. Regístrate o usa Google para continuar.` 
             }, { status: 403 });
+        }
+
+        // ──────────────────────────────────────────────────────────────────
+        // UUID Resolution Patch (Phase 9B - getOrCreate Resolution)
+        // Auto-migrates legacy sessions or repairs missing user records.
+        // ──────────────────────────────────────────────────────────────────
+        if (session && !isGuest && !isUuid(session.id)) {
+            console.log(`📡 [UUID PATCH] Non-UUID or missing record detected for ${session.email}. Migrating...`);
+            try {
+                let dbUser = await getUserByEmail(session.email);
+
+                if (!dbUser) {
+                    // AUTO-REPAIR: Create user record on the fly if session exists but DB was missed
+                    console.log(`📡 [UUID PATCH] Record missing for ${session.email}. Auto-creating...`);
+                    dbUser = await createUser({
+                        email: session.email,
+                        name: session.name || "Usuario Migrado",
+                        passwordHash: "google-social-migrated",
+                        avatarUrl: session.avatarUrl || "",
+                        googleAvatarUrl: session.googleAvatarUrl || null,
+                        role: "user",
+                        professionalProfile: session.professionalProfile || null,
+                    });
+                }
+
+                if (dbUser) {
+                    userId = dbUser.id; // Switch current context to real UUID
+                    await updateSessionData({ id: dbUser.id }); // Migrate persistent session
+                    console.log(`✅ [UUID PATCH] Migration success: ${dbUser.id}`);
+                }
+            } catch (patchErr) {
+                console.error("❌ [UUID PATCH] Migration failed structural fall:", patchErr);
+            }
         }
 
         // Phase 7: Profile context for AI

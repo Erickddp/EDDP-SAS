@@ -4,6 +4,8 @@ import { Pool, QueryResult, QueryResultRow } from 'pg';
  * PRODUCTION DATABASE CONNECTION LAYER
  * Resolves ENOTFOUND issues by strictly using the native DATABASE_URL from Vercel/Environment.
  * Direct connection without manual URL building or HTTP malformed prefixes.
+ * NOTA: Aquí EXPRESAMENTE usamos DATABASE_URL (Pooler) y NO DIRECT_URL para evitar
+ * agotar las conexiones en entorno Serverless. Los scripts usan DIRECT_URL.
  */
 
 const dbUrl = process.env.DATABASE_URL;

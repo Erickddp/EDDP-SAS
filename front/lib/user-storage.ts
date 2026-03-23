@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { PlanType } from "./saas-constants";
 
 export type UserRole = "user" | "guest" | "admin";
@@ -63,11 +64,14 @@ export async function createUser(data: Omit<User, "id" | "createdAt" | "plan" | 
     try {
         await client.query("BEGIN");
         
+        // Ensure a valid UUID is generated in the backend (Phase 9B robustness)
+        const userId = crypto.randomUUID();
+        
         const { rows } = await client.query(
-            `INSERT INTO users (email, name, password_hash, avatar_url, role, professional_profile)
-             VALUES ($1, $2, $3, $4, $5, $6)
+            `INSERT INTO users (id, email, name, password_hash, avatar_url, role, professional_profile)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING *`,
-            [data.email, data.name, data.passwordHash, data.avatarUrl, data.role, data.professionalProfile || null]
+            [userId, data.email, data.name, data.passwordHash, data.avatarUrl, data.role, data.professionalProfile || null]
         );
         
         const user = rows[0];
