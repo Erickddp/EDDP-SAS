@@ -1,21 +1,41 @@
 import Redis from "ioredis";
 import crypto from "crypto";
 
-const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+const REDIS_URL = process.env.REDIS_URL || process.env.UPSTASH_REDIS_URL || "";
 
 // Lazy initialization for Redis to avoid connection errors if not available
 let redisInstance: Redis | null = null;
+let connectionFailed = false;
 
 export function getRedis() {
+    if (connectionFailed) return null;
+    if (!REDIS_URL) {
+        if (!redisInstance) {
+            console.warn("[REDIS] No configurado (REDIS_URL faltante) - Modo Bypass activado.");
+            connectionFailed = true;
+        }
+        return null;
+    }
+
     if (!redisInstance) {
         try {
             redisInstance = new Redis(REDIS_URL, {
-                maxRetriesPerRequest: 1,
-                connectTimeout: 2000,
+                maxRetriesPerRequest: 0, // No reintentos infinitos para evitar bloqueos
+                connectTimeout: 1000,    // Timeouts agresivos para no degradar el chat
+                enableOfflineQueue: false, // No encolar si está offline
             });
-            redisInstance.on("error", (err) => console.warn("Redis Error:", err.message));
+
+            redisInstance.on("error", (err) => {
+                // Solo loguear una vez para no saturar la consola
+                if (!connectionFailed) {
+                    console.warn(`[REDIS] Error de conexión: ${err.message}. Modo Bypass activado.`);
+                    connectionFailed = true;
+                }
+            });
         } catch (e) {
-            console.warn("Could not connect to Redis, caching disabled.");
+            console.warn("[REDIS] Excepción al inicializar cliente. Avanzando sin caché.");
+            connectionFailed = true;
+            return null;
         }
     }
     return redisInstance;
@@ -34,10 +54,10 @@ export function generateCacheKey(query: string, profile: string = "general"): st
  * Attempts to retrieve a cached response.
  */
 export async function getCachedResponse(query: string, profile: string = "general"): Promise<any | null> {
-    const redis = getRedis();
-    if (!redis) return null;
-
     try {
+        const redis = getRedis();
+        if (!redis) return null;
+
         const key = generateCacheKey(query, profile);
         const cached = await redis.get(key);
         if (cached) {
@@ -45,7 +65,7 @@ export async function getCachedResponse(query: string, profile: string = "genera
             return JSON.parse(cached);
         }
     } catch (e) {
-        console.warn("Cache read error:", e);
+        // Fail-open: no lanzamos error al usuario
     }
     return null;
 }
@@ -54,37 +74,38 @@ export async function getCachedResponse(query: string, profile: string = "genera
  * Saves a response to the semantic cache.
  */
 export async function setCachedResponse(query: string, response: any, profile: string = "general", ttl: number = 3600 * 24) {
-    const redis = getRedis();
-    if (!redis) return;
-
     try {
+        const redis = getRedis();
+        if (!redis) return;
+
         const key = generateCacheKey(query, profile);
         await redis.set(key, JSON.stringify(response), "EX", ttl);
         console.log(`[CACHE SET] Response saved for: "${query.substring(0, 30)}..."`);
     } catch (e) {
-        console.warn("Cache write error:", e);
+        // Silencioso para no romper la experiencia
     }
 }
+
 /**
  * Basic IP-based Rate Limiter (Fixed Window)
  */
 export async function isRateLimited(ip: string, limit: number = 5, windowSeconds: number = 60): Promise<boolean> {
-    const redis = getRedis();
-    if (!redis) return false; // Fail-open for UX, though ideally should be fail-closed for security
-
-    const key = `ratelimit:ip:${ip}`;
     try {
+        const redis = getRedis();
+        if (!redis) return false; // Fail-open for UX
+
+        const key = `ratelimit:ip:${ip}`;
         const current = await redis.incr(key);
         if (current === 1) {
             await redis.expire(key, windowSeconds);
         }
         
         if (current > limit) {
-            console.warn(`[RATE LIMIT] IP ${ip} exceeded limit (${current}/${limit})`);
+            console.warn(`[RATE LIMIT] IP ${ip} excedió límite (${current}/${limit})`);
             return true;
         }
     } catch (e) {
-        console.warn("Rate limit check error:", e);
+        // Si Redis falla, permitimos la consulta para no bloquear usuarios legítimos
     }
     return false;
 }

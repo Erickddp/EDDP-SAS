@@ -460,11 +460,25 @@ export function ChatWindow({
                                 <button
                                     type="button"
                                     onClick={onOpenSidebar}
-                                    className="mt-0.5 inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-border-glow bg-bg-sec px-3 text-text-sec shadow-sm transition-all hover:border-cyan-main/30 hover:text-text-main"
+                                    className={cn(
+                                        "shrink-0 border border-border-glow bg-bg-sec text-text-sec shadow-sm transition-all hover:border-cyan-main/30 hover:text-text-main",
+                                        isMobile
+                                            ? "inline-flex h-10 w-10 items-center justify-center rounded-xl"
+                                            : "inline-flex h-11 items-center justify-center gap-3 rounded-2xl px-4"
+                                    )}
                                     aria-label="Abrir barra lateral"
                                 >
-                                    <PanelLeft size={18} />
-                                    {!isMobile && <span className="hidden text-sm font-medium md:inline">Historial</span>}
+                                    {isMobile ? (
+                                        <PanelLeft size={18} />
+                                    ) : (
+                                        <>
+                                            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-border-glow bg-white p-1.5 shadow-sm dark:bg-bg-sec">
+                                                <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain dark:hidden" />
+                                                <img src="/icono2.png" alt="MyFiscal" className="hidden h-full w-full object-contain dark:block" />
+                                            </div>
+                                            <span className="text-sm font-semibold md:inline">MyFiscal</span>
+                                        </>
+                                    )}
                                 </button>
                             )}
                             <div className="min-w-0">

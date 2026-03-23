@@ -82,7 +82,7 @@ export function ParticlesBg({
             window.removeEventListener("resize", resize);
             cancelAnimationFrame(animationFrameId);
         };
-    }, []);
+    }, [color, density, maxParticles, opacityRange, sizeRange, speedRange]);
 
     return (
         <canvas

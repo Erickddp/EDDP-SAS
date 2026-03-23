@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, pgEnum, index } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -53,4 +53,8 @@ export const messages = pgTable("messages", {
     content: jsonb("content").notNull(),
     sources: jsonb("sources"),
     createdAt: timestamp("created_at").defaultNow(),
+}, (table) => {
+    return {
+        conversationIdIndex: index("conversation_id_idx").on(table.conversationId),
+    };
 });
