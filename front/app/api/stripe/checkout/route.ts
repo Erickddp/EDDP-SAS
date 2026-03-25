@@ -3,12 +3,24 @@ import { getSession } from "@/lib/session";
 import { stripe } from "@/lib/stripe";
 import { handleApiError, AppErrorType, validatedMethod } from "@/lib/error-handler";
 
-const STRIPE_PRO_PRICE_ID = process.env.STRIPE_PRO_PRICE_ID;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.URL || "http://localhost:3000";
-
 export async function POST(req: Request) {
     const methodError = validatedMethod(req, ["POST"]);
     if (methodError) return methodError;
+
+    // Fail-fast Environment Validation
+    const STRIPE_PRO_PRICE_ID = process.env.STRIPE_PRO_PRICE_ID;
+    const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.URL || "http://localhost:3000";
+
+    if (!STRIPE_SECRET_KEY) {
+        console.error("[STRIPE CHECKOUT ERROR] Missing STRIPE_SECRET_KEY");
+        return NextResponse.json({ error: "Missing STRIPE_SECRET_KEY", code: "ENV_CONFIG_ERROR" }, { status: 400 });
+    }
+
+    if (!STRIPE_PRO_PRICE_ID) {
+        console.error("[STRIPE CHECKOUT ERROR] Missing STRIPE_PRO_PRICE_ID");
+        return NextResponse.json({ error: "Missing STRIPE_PRO_PRICE_ID", code: "ENV_CONFIG_ERROR" }, { status: 400 });
+    }
 
     try {
         const session = await getSession();
@@ -16,10 +28,7 @@ export async function POST(req: Request) {
             return handleApiError(new Error("No autorizado"), AppErrorType.AUTH);
         }
 
-        if (!STRIPE_PRO_PRICE_ID) {
-            console.warn("Falta STRIPE_PRO_PRICE_ID en las variables de entorno.");
-            return handleApiError(new Error("Configuración de pagos incompleta. Verifica STRIPE_PRO_PRICE_ID."), AppErrorType.INTERNAL);
-        }
+        console.log(`[STRIPE CHECKOUT] Creating session for user: ${session.id} (${session.email})`);
 
         const stripeSession = await stripe.checkout.sessions.create({
             mode: "subscription",
@@ -32,15 +41,20 @@ export async function POST(req: Request) {
             ],
             success_url: `${APP_URL}/dashboard/billing?success=true`,
             cancel_url: `${APP_URL}/dashboard/billing?canceled=true`,
-            client_reference_id: session.id, // ID del usuario para el webhook
+            client_reference_id: session.id,
             metadata: {
                 userId: session.id,
             },
             customer_email: session.email,
         });
 
+        if (!stripeSession.url) {
+            throw new Error("Stripe did not return a checkout session URL");
+        }
+
         return NextResponse.json({ url: stripeSession.url });
     } catch (error: any) {
+        console.error('[STRIPE CHECKOUT ERROR]', error);
         return handleApiError(error, AppErrorType.INTERNAL);
     }
 }
