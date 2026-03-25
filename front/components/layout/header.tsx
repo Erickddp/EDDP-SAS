@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { Container } from "./container";
@@ -22,6 +22,14 @@ export function Header({ user, forceGuestView = false, hasSession = false }: Hea
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const showAuthenticatedActions = Boolean(user) && !forceGuestView;
     const enterHref = hasSession ? "/chat" : "/login";
+    const mobileAvatarUrl = user?.googleAvatarUrl || user?.avatarUrl || "";
+    const mobileDisplayName = user?.name?.trim() || "Cuenta activa";
+    const mobileInitials = mobileDisplayName
+        .split(" ")
+        .map((part) => part[0] || "")
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -37,81 +45,90 @@ export function Header({ user, forceGuestView = false, hasSession = false }: Hea
                 className={cn(
                     "fixed top-0 z-30 w-full transition-all duration-300",
                     isScrolled
-                        ? "bg-bg-main/80 shadow-sm backdrop-blur-lg border-b border-border-glow"
-                        : "bg-transparent"
+                        ? "border-b border-border-glow bg-bg-main/70 shadow-sm backdrop-blur-xl"
+                        : "border-b border-transparent bg-bg-main/10 backdrop-blur-md"
                 )}
             >
                 <Container>
                     <div className="flex h-20 items-center justify-between">
                         <div className="flex items-center">
                             <Link href="/" className="flex items-center gap-2">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border-glow bg-white dark:bg-bg-sec shadow-sm overflow-hidden p-2">
+                                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-border-glow bg-white p-2 shadow-sm dark:bg-bg-sec">
                                     <img src="/icono.png" alt="MyFiscal" className="h-full w-full object-contain dark:hidden" />
-                                    <img src="/icono2.png" alt="MyFiscal" className="h-full w-full object-contain hidden dark:block" />
+                                    <img src="/icono2.png" alt="MyFiscal" className="hidden h-full w-full object-contain dark:block" />
                                 </div>
-                                <span className="hidden text-xl font-bold tracking-tight text-text-main sm:block">
-                                    MyFiscal
-                                </span>
+                                <span className="hidden text-xl font-bold tracking-tight text-text-main sm:block">MyFiscal</span>
                             </Link>
                         </div>
 
-                        {/* Desktop Nav */}
                         <nav className="hidden items-center space-x-8 md:flex">
                             <Link href="/#como-funciona" className="text-sm font-medium text-text-sec transition-colors hover:text-cyan-main">
-                                Cómo funciona
+                                Como funciona
                             </Link>
                             <Link href="/#precios" className="text-sm font-medium text-text-sec transition-colors hover:text-cyan-main">
                                 Precios
                             </Link>
                             <ThemeToggle />
                             {showAuthenticatedActions ? (
-                                <div className="flex items-center gap-4 ml-4">
+                                <div className="ml-4 flex items-center gap-4">
                                     <div className="flex items-center gap-2">
-                                        {user?.avatarUrl && (
-                                            <img 
-                                                src={user.avatarUrl} 
-                                                alt={user.name || "Usuario"} 
-                                                className="h-8 w-8 rounded-full border border-border-glow object-cover shadow-sm bg-bg-sec" 
+                                        {(user?.googleAvatarUrl || user?.avatarUrl) && (
+                                            <img
+                                                src={user?.googleAvatarUrl || user?.avatarUrl}
+                                                alt={user?.name || "Usuario"}
+                                                className="h-8 w-8 rounded-full border border-border-glow bg-bg-sec object-cover shadow-sm"
                                             />
                                         )}
-                                        <span className="text-sm font-semibold text-text-main hidden lg:inline-block">
-                                            {user?.name}
-                                        </span>
+                                        <span className="hidden text-sm font-semibold text-text-main lg:inline-block">{user?.name}</span>
                                     </div>
                                     <Link href="/chat">
-                                        <Button variant="primary" size="sm" className="hidden sm:inline-flex bg-cyan-main text-bg-main hover:bg-cyan-glow transition-all shadow-lg shadow-cyan-main/20">
+                                        <Button variant="primary" size="sm" className="hidden bg-cyan-main text-bg-main shadow-lg shadow-cyan-main/20 transition-all hover:bg-cyan-glow sm:inline-flex">
                                             Ir a mis Chats
                                         </Button>
                                     </Link>
                                     <form action={logout}>
-                                        <Button variant="ghost" size="sm" type="submit" className="text-text-sec hover:text-red-400 hover:bg-red-950/20 transition-all">
+                                        <Button variant="ghost" size="sm" type="submit" className="text-text-sec transition-all hover:bg-red-950/20 hover:text-red-400">
                                             Salir
                                         </Button>
                                     </form>
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-3 ml-4">
+                                <div className="ml-4 flex items-center gap-3">
                                     <Link href={enterHref}>
                                         <Button variant="ghost" size="sm" className="text-text-sec hover:text-cyan-main">
-                                            Iniciar Sesión
+                                            Iniciar sesion
                                         </Button>
                                     </Link>
                                     <Link href="/register">
-                                        <Button variant="primary" size="sm" className="bg-cyan-main text-bg-main hover:bg-cyan-glow shadow-md shadow-cyan-main/10">
-                                            Regístrate
+                                        <Button variant="primary" size="sm" className="bg-cyan-main text-bg-main shadow-md shadow-cyan-main/10 hover:bg-cyan-glow">
+                                            Registrate
                                         </Button>
                                     </Link>
                                 </div>
                             )}
                         </nav>
 
-                        {/* Mobile Nav Toggle */}
-                        <div className="md:hidden flex items-center gap-2">
+                        <div className="flex items-center gap-2 md:hidden">
+                            {showAuthenticatedActions && (
+                                <Link
+                                    href="/account"
+                                    className="inline-flex max-w-[150px] items-center gap-2 rounded-xl border border-border-glow bg-bg-sec/70 px-2.5 py-1.5 text-text-main backdrop-blur-md transition-colors hover:border-cyan-main/40"
+                                >
+                                    <span className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-glow bg-bg-main text-[11px] font-semibold">
+                                        {mobileAvatarUrl ? (
+                                            <img src={mobileAvatarUrl} alt={mobileDisplayName} className="h-full w-full object-cover" />
+                                        ) : (
+                                            mobileInitials
+                                        )}
+                                    </span>
+                                    <span className="truncate text-xs font-semibold">{mobileDisplayName}</span>
+                                </Link>
+                            )}
                             <ThemeToggle compact />
                             <button
                                 onClick={() => setMobileMenuOpen(true)}
-                                className="rounded-lg p-2 text-text-sec transition-colors hover:bg-bg-sec hover:text-text-main"
-                                aria-label="Abrir menú"
+                                className="rounded-xl border border-border-glow bg-bg-sec/70 p-2 text-text-sec backdrop-blur-md transition-colors hover:border-cyan-main/50 hover:text-text-main"
+                                aria-label="Abrir menu"
                             >
                                 <Menu size={24} />
                             </button>

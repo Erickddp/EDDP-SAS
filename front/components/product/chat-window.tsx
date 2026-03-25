@@ -317,6 +317,10 @@ export function ChatWindow({
                             } else if (line.startsWith('d:')) { // Metadata Block
                                 metadata = JSON.parse(line.substring(2));
                                 continue;
+                            } else if (/^[a-zA-Z0-9]:/.test(line)) {
+                                // Ignore other Data Stream Protocol parts (like 3: tool-call, a: tool-result, etc.)
+                                // to prevent them from corrupting the raw text stream and JSON structured answer parser
+                                continue;
                             } else {
                                 // Fallback for raw text streams (if no prefix)
                                 try {
@@ -329,15 +333,27 @@ export function ChatWindow({
                             if (textPart) {
                                 fullText += textPart;
                                 
-                                // Live parsing for structured answers
+                                // Live parsing for structured answers (with plain text fallback)
                                 let displayContent: string | StructuredAnswer = fullText;
                                 if (fullText.trim().startsWith('{')) {
                                     try {
                                         const result = await parsePartialJson(fullText);
-                                        if (result.value && typeof result.value === 'object') {
+                                        if (result && result.value && typeof result.value === 'object') {
                                             displayContent = result.value as unknown as StructuredAnswer;
+                                        } else {
+                                            // Fallback manual para intentar extraer el sumario específico
+                                            const match = fullText.match(/"summary"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)/);
+                                            if (match) {
+                                                displayContent = { summary: match[1] } as unknown as StructuredAnswer;
+                                            } else {
+                                                // Si el JSON no es parseable ni tiene "summary" aún, mostramos estado provisional
+                                                displayContent = { summary: "Analizando normativa fiscal..." } as unknown as StructuredAnswer;
+                                            }
                                         }
-                                    } catch { }
+                                    } catch {
+                                        // Si falla el parseo parcial, volvemos a mostrar el texto plano para no bloquear al usuario
+                                        displayContent = fullText;
+                                    }
                                 }
 
                                 setMessages(prev => prev.map(m => 
@@ -440,7 +456,7 @@ export function ChatWindow({
     const handleAction = async (actionType: string) => {
         if (actionType === "upgrade_pro") {
             try {
-                const res = await fetch("/api/billing/create-checkout", { method: "POST" });
+                const res = await fetch("/api/stripe/checkout", { method: "POST" });
                 if (res.ok) {
                     const { url } = await res.json();
                     window.location.href = url;

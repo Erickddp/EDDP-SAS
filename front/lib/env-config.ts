@@ -7,7 +7,8 @@ const getEnv = (key: string, defaultValue?: string, required = true): string => 
     const value = process.env[key] || defaultValue;
     if (required && !value) {
         // In production, we want to fail fast if critical config is missing
-        if (process.env.NODE_ENV === 'production') {
+        // EXCEPT during build time where secrets might be missing
+        if (process.env.NODE_ENV === 'production' && process.env.SKIP_BUILD_STATIC_GENERATION !== 'true') {
             throw new Error(`CRITICAL CONFIG ERROR: Missing required environment variable: ${key}`);
         } else {
             console.warn(`⚠️ Warning: Missing environment variable: ${key}. Using default or null.`);
@@ -31,7 +32,7 @@ export function validateConfig() {
     const critical = ['DATABASE_URL', 'OPENAI_API_KEY', 'SESSION_SECRET'];
     const missing = critical.filter(key => !(CONFIG as any)[key]);
     
-    if (missing.length > 0 && CONFIG.NODE_ENV === 'production') {
+    if (missing.length > 0 && CONFIG.NODE_ENV === 'production' && process.env.SKIP_BUILD_STATIC_GENERATION !== 'true') {
         throw new Error(`\n❌ FAILED TO START: Missing critical configuration:\n${missing.join('\n')}\n`);
     }
     

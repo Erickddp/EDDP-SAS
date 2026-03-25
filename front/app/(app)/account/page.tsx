@@ -35,7 +35,7 @@ export default function AccountPage() {
     useEffect(() => {
         async function fetchStatus() {
             try {
-                const res = await fetch("/api/billing/status");
+                const res = await fetch("/api/stripe/status");
                 if (res.status === 401) {
                     router.push("/login");
                     return;
@@ -56,7 +56,7 @@ export default function AccountPage() {
         setCheckoutLoading(true);
         console.log("[Account] Initiating checkout for PRO plan");
         try {
-            const res = await fetch("/api/billing/create-checkout", {
+            const res = await fetch("/api/stripe/checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ plan: "pro" }),

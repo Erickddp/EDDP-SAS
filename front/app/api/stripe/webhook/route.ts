@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { stripe } from "@/lib/stripe";
 import { updateSubscription } from "@/lib/user-storage";
 import { headers } from "next/headers";
 
 export async function POST(req: Request) {
+    if (process.env.SKIP_BUILD_STATIC_GENERATION === 'true') {
+        return NextResponse.json({ received: true });
+    }
+
     const body = await req.text();
     const signature = (await headers()).get("stripe-signature") as string;
 

@@ -1,19 +1,32 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
+import { LogOut, UserRound, X } from "lucide-react";
+import { logout } from "@/lib/auth";
+import type { UserSession } from "@/lib/session";
 import { Button } from "../ui/button";
 
 interface MobileMenuProps {
     isOpen: boolean;
-    user?: any;
+    user?: UserSession | null;
     onClose: () => void;
     enterHref?: string;
 }
 
 export function MobileMenu({ isOpen, user, onClose, enterHref = "/login" }: MobileMenuProps) {
     const hasSession = Boolean(user);
+    const avatarUrl = user?.googleAvatarUrl || user?.avatarUrl || "";
+    const name = user?.name?.trim() || "Usuario activo";
+    const email = user?.email || "Sesion iniciada";
+    const plan = user?.plan ? `Plan ${user.plan}` : "Plan gratis";
+    const initials = name
+        .split(" ")
+        .map((part) => part[0] || "")
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -23,72 +36,118 @@ export function MobileMenu({ isOpen, user, onClose, enterHref = "/login" }: Mobi
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 z-40 bg-bg-main/80 backdrop-blur-sm"
+                        className="fixed inset-0 z-40 bg-bg-main/70 backdrop-blur-sm"
                     />
-                    <motion.div
+                    <motion.aside
                         initial={{ x: "100%" }}
                         animate={{ x: 0 }}
                         exit={{ x: "100%" }}
-                        transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                        className="fixed inset-y-0 right-0 z-50 w-full max-w-sm border-l border-border-glow bg-bg-sec p-6 shadow-xl"
+                        transition={{ type: "spring", damping: 26, stiffness: 240 }}
+                        className="fixed inset-y-0 right-0 z-50 w-full max-w-sm border-l border-border-glow bg-bg-sec/90 p-5 shadow-2xl backdrop-blur-2xl"
                     >
-                        <div className="mb-8 flex items-center justify-between">
+                        <div className="mb-5 flex items-center justify-between">
                             <span className="text-xl font-bold text-text-main">
                                 My<span className="text-cyan-main">Fiscal</span>
                             </span>
                             <button
                                 onClick={onClose}
-                                className="rounded-full p-2 text-text-sec transition-colors hover:bg-bg-main hover:text-text-main"
-                                aria-label="Cerrar menú"
+                                className="rounded-full border border-border-glow p-2 text-text-sec transition-colors hover:border-cyan-main/40 hover:text-text-main"
+                                aria-label="Cerrar menu"
                             >
-                                <X size={24} />
+                                <X size={20} />
                             </button>
                         </div>
-                        <nav className="flex flex-col space-y-6">
+
+                        {hasSession && (
+                            <div className="mb-6 rounded-2xl border border-border-glow bg-bg-main/55 p-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-border-glow bg-bg-sec text-sm font-semibold text-text-main">
+                                        {avatarUrl ? <img src={avatarUrl} alt={name} className="h-full w-full object-cover" /> : initials}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-semibold text-text-main">{name}</p>
+                                        <p className="truncate text-xs text-text-sec">{email}</p>
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex items-center justify-between gap-2">
+                                    <span className="rounded-full border border-cyan-main/25 bg-cyan-main/10 px-2.5 py-1 text-[11px] font-medium text-cyan-main">
+                                        Sesion activa
+                                    </span>
+                                    <span className="truncate text-[11px] text-text-sec">{plan}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <nav className="flex flex-col gap-2">
                             <Link
-                                href="#como-funciona"
-                                className="text-lg font-medium text-text-sec transition-colors hover:text-cyan-main"
+                                href="/#como-funciona"
+                                className="rounded-xl px-3 py-2 text-base font-medium text-text-sec transition-colors hover:bg-bg-main/60 hover:text-cyan-main"
                                 onClick={onClose}
                             >
-                                Cómo funciona
+                                Como funciona
                             </Link>
                             <Link
-                                href="#precios"
-                                className="text-lg font-medium text-text-sec transition-colors hover:text-cyan-main"
+                                href="/#precios"
+                                className="rounded-xl px-3 py-2 text-base font-medium text-text-sec transition-colors hover:bg-bg-main/60 hover:text-cyan-main"
                                 onClick={onClose}
                             >
                                 Precios
                             </Link>
                             <Link
                                 href="/chat"
-                                className="text-lg font-medium text-text-sec transition-colors hover:text-cyan-main"
+                                className="rounded-xl px-3 py-2 text-base font-medium text-text-sec transition-colors hover:bg-bg-main/60 hover:text-cyan-main"
                                 onClick={onClose}
                             >
                                 Chat
                             </Link>
-                            <Link
-                                href="/account"
-                                className="text-lg font-medium text-text-sec transition-colors hover:text-cyan-main"
-                                onClick={onClose}
-                            >
-                                Mi Cuenta
-                            </Link>
-                            <div className="h-px w-full bg-border-glow" />
-                            {hasSession ? (
-                                <Link href="/chat" onClick={onClose}>
-                                    <Button variant="primary" className="w-full bg-cyan-main text-bg-main">
-                                        Ir a mis Chats
-                                    </Button>
-                                </Link>
-                            ) : (
-                                <Link href={enterHref} onClick={onClose}>
-                                    <Button variant="primary" className="w-full bg-cyan-main text-bg-main">
-                                        Iniciar Sesión
-                                    </Button>
+                            {hasSession && (
+                                <Link
+                                    href="/account"
+                                    className="rounded-xl px-3 py-2 text-base font-medium text-text-sec transition-colors hover:bg-bg-main/60 hover:text-cyan-main"
+                                    onClick={onClose}
+                                >
+                                    Mi cuenta
                                 </Link>
                             )}
                         </nav>
-                    </motion.div>
+
+                        <div className="mt-6 border-t border-border-glow pt-5">
+                            {hasSession ? (
+                                <div className="space-y-3">
+                                    <Link href="/chat" onClick={onClose}>
+                                        <Button variant="primary" className="w-full bg-cyan-main text-bg-main hover:bg-cyan-glow">
+                                            Ir a mis Chats
+                                        </Button>
+                                    </Link>
+                                    <Link href="/account" onClick={onClose}>
+                                        <Button variant="secondary" className="w-full">
+                                            <UserRound size={16} className="mr-2" />
+                                            Ver mi cuenta
+                                        </Button>
+                                    </Link>
+                                    <form action={logout}>
+                                        <Button variant="ghost" type="submit" className="w-full justify-center text-text-sec hover:bg-red-950/20 hover:text-red-400">
+                                            <LogOut size={16} className="mr-2" />
+                                            Cerrar sesion
+                                        </Button>
+                                    </form>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <Link href={enterHref} onClick={onClose}>
+                                        <Button variant="primary" className="w-full bg-cyan-main text-bg-main hover:bg-cyan-glow">
+                                            Iniciar sesion
+                                        </Button>
+                                    </Link>
+                                    <Link href="/register" onClick={onClose}>
+                                        <Button variant="secondary" className="w-full">
+                                            Crear cuenta
+                                        </Button>
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
+                    </motion.aside>
                 </>
             )}
         </AnimatePresence>

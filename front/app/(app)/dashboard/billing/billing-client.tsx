@@ -25,7 +25,7 @@ export default function BillingClient() {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        fetch("/api/billing/status")
+        fetch("/api/stripe/status")
             .then(res => res.json())
             .then(data => {
                 if (data.error) throw new Error(data.error);
@@ -89,9 +89,16 @@ export default function BillingClient() {
         }
     };
 
-    const itemVariants = {
+    const itemVariants: import("framer-motion").Variants = {
         hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } }
+        visible: { 
+            opacity: 1, 
+            y: 0, 
+            transition: { 
+                type: "spring" as const, 
+                stiffness: 100 
+            } 
+        }
     };
 
     return (

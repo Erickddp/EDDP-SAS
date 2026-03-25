@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { getSession } from "@/lib/session";
 import { stripe } from "@/lib/stripe";
 import { getSubscriptionByUserId } from "@/lib/user-storage";
@@ -9,6 +10,10 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.URL || "http://lo
 export async function POST(req: Request) {
     const methodError = validatedMethod(req, ["POST"]);
     if (methodError) return methodError;
+
+    if (process.env.SKIP_BUILD_STATIC_GENERATION === 'true') {
+        return NextResponse.json({ url: `${APP_URL}/dashboard/billing` });
+    }
 
     try {
         const session = await getSession();

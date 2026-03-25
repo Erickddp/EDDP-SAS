@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { getSession } from "@/lib/session";
 import { stripe } from "@/lib/stripe";
 import { handleApiError, AppErrorType, validatedMethod } from "@/lib/error-handler";
@@ -11,6 +12,11 @@ export async function POST(req: Request) {
     const STRIPE_PRO_PRICE_ID = process.env.STRIPE_PRO_PRICE_ID;
     const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.URL || "http://localhost:3000";
+    
+    // Skip static generation during build if secrets are missing
+    if (process.env.SKIP_BUILD_STATIC_GENERATION === 'true') {
+        return NextResponse.json({ url: `${APP_URL}/dashboard/billing` });
+    }
 
     if (!STRIPE_SECRET_KEY) {
         console.error("[STRIPE CHECKOUT ERROR] Missing STRIPE_SECRET_KEY");

@@ -1,0 +1,11 @@
+﻿app/api/chat-v2/route.ts(161,21): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Type '({ respuesta_corta }: { respuesta_corta: any; }) => Promise<{ resultado: string; contexto: any; }>' is not assignable to type 'undefined'.
+app/api/chat-v2/route.ts(161,39): error TS7031: Binding element 'respuesta_corta' implicitly has an 'any' type.
+app/api/chat-v2/route.ts(170,21): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Type '({ query }: { query: any; }) => Promise<{ articulos_encontrados: { documento: any; articulo: any; texto_relevante: any; }[]; }>' is not assignable to type 'undefined'.
+app/api/chat-v2/route.ts(170,39): error TS7031: Binding element 'query' implicitly has an 'any' type.
+app/api/chat-v2/route.ts(206,13): error TS2353: Object literal may only specify known properties, and 'maxSteps' does not exist in type 'CallSettings & { system?: string | SystemModelMessage | SystemModelMessage[] | undefined; } & { messages: ModelMessage[]; prompt?: undefined; } & { ...; }'.
+app/api/chat-v2/route.ts(216,56): error TS2339: Property 'promptTokens' does not exist on type 'LanguageModelUsage'.
+app/api/chat-v2/route.ts(217,60): error TS2339: Property 'completionTokens' does not exist on type 'LanguageModelUsage'.
