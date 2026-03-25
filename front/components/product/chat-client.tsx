@@ -108,6 +108,8 @@ export function ChatClient({ initialSession }: ChatClientProps) {
 
     const handleUpdateMetadata = (newTitle?: string, newTags?: string[]) => {
         if (!activeId) return;
+        const isGuest = !initialSession || initialSession.role === "guest";
+
         const updated = conversations.map(c =>
             c.id === activeId ? { 
                 ...c, 
@@ -117,7 +119,12 @@ export function ChatClient({ initialSession }: ChatClientProps) {
             } : c
         );
         setConversations(updated);
-        Storage.saveConversations(updated);
+        
+        if (isGuest) {
+            Storage.saveConversations(updated);
+        }
+        // Note: Title/Tags are also synced via the chat API's onFinish flow, 
+        // but manual updates from UI (if implemented) would need a remote PATCH as well.
     };
 
     const handlePrefsChange = (mode: ChatMode, level: DetailLevel) => {
@@ -134,8 +141,25 @@ export function ChatClient({ initialSession }: ChatClientProps) {
         }
     };
 
-    const handleArchiveConversation = (id: string) => {
-        Storage.archiveConversation(id);
+    const handleArchiveConversation = async (id: string) => {
+        const isGuest = !initialSession || initialSession.role === "guest";
+        
+        if (isGuest) {
+            Storage.archiveConversation(id);
+        } else {
+            try {
+                const res = await fetch("/api/chat/history", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ conversationId: id, archived: true })
+                });
+                if (!res.ok) throw new Error("Error al archivar en servidor");
+            } catch (err) {
+                console.error("[ARCHIVE ERROR]", err);
+                return; // Do not update UI on failure
+            }
+        }
+
         const updatedConversations = conversations.map((conversation) =>
             conversation.id === id
                 ? { ...conversation, archived: true, updatedAt: Date.now() }
@@ -149,8 +173,25 @@ export function ChatClient({ initialSession }: ChatClientProps) {
         }
     };
 
-    const handleRestoreConversation = (id: string) => {
-        Storage.restoreConversation(id);
+    const handleRestoreConversation = async (id: string) => {
+        const isGuest = !initialSession || initialSession.role === "guest";
+        
+        if (isGuest) {
+            Storage.restoreConversation(id);
+        } else {
+            try {
+                const res = await fetch("/api/chat/history", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ conversationId: id, archived: false })
+                });
+                if (!res.ok) throw new Error("Error al restaurar en servidor");
+            } catch (err) {
+                console.error("[RESTORE ERROR]", err);
+                return;
+            }
+        }
+
         const updatedConversations = conversations.map((conversation) =>
             conversation.id === id
                 ? { ...conversation, archived: false, updatedAt: Date.now() }
@@ -160,8 +201,23 @@ export function ChatClient({ initialSession }: ChatClientProps) {
         setActiveId(id);
     };
 
-    const handleDeleteConversation = (id: string) => {
-        Storage.deleteConversation(id);
+    const handleDeleteConversation = async (id: string) => {
+        const isGuest = !initialSession || initialSession.role === "guest";
+        
+        if (isGuest) {
+            Storage.deleteConversation(id);
+        } else {
+            try {
+                const res = await fetch(`/api/chat/history?conversationId=${id}`, {
+                    method: "DELETE"
+                });
+                if (!res.ok) throw new Error("Error al eliminar en servidor");
+            } catch (err) {
+                console.error("[DELETE ERROR]", err);
+                return;
+            }
+        }
+
         const updatedConversations = conversations.filter((conversation) => conversation.id !== id);
         setConversations(updatedConversations);
 

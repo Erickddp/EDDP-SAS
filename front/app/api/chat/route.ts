@@ -541,13 +541,9 @@ export async function POST(req: Request) {
 
                     // Persist to DB
                     if (userId !== "unknown") {
-                        let savedContent = completion.text;
-                        try {
-                            if (savedContent.trim().startsWith('{')) {
-                                savedContent = JSON.parse(savedContent);
-                            }
-                        } catch(e) {}
+                        const finalContent = completion.text;
 
+                        // 1. Save/Update Conversation
                         await saveConversation(userId, {
                             id: body.conversationId,
                             title: (body.history?.length === 0) ? (titleSuggestion as string) : "Consulta Fiscal",
@@ -555,9 +551,11 @@ export async function POST(req: Request) {
                             detailLevel: body.detailLevel,
                             archived: false,
                             createdAt: Date.now(),
-                            updatedAt: Date.now()
+                            updatedAt: Date.now(),
+                            tags: queryDebug.matchedKeywords?.slice(0, 3) || [queryAnalysis.detectedIntent]
                         });
 
+                        // 2. Save User Message
                         await saveChatMsg({
                             id: `user-${Date.now()}`,
                             conversationId: body.conversationId,
@@ -565,6 +563,21 @@ export async function POST(req: Request) {
                             content: body.message,
                             createdAt: Date.now()
                         });
+
+                        // 3. Save Assistant Message (Refactor Core: Sealed Persistence)
+                        try {
+                            await saveChatMsg({
+                                id: `assistant-${Date.now()}`,
+                                conversationId: body.conversationId,
+                                role: "assistant",
+                                content: finalContent,
+                                sources: context.sources,
+                                createdAt: Date.now()
+                            });
+                            console.log(`✅ [DB PERSISTENCE] Assistant message saved for conv: ${body.conversationId}`);
+                        } catch (dbErr) {
+                            console.error('[DB INSERT ERROR (Assistant)]', dbErr);
+                        }
                     }
                 } catch (err) {
                     console.error("Error in onFinish side-effects:", err);
@@ -572,25 +585,13 @@ export async function POST(req: Request) {
             }
         });
 
-        const prefixedStream = (result.textStream as any).pipeThrough(
-            new TransformStream({
-                transform(chunk: string, controller: TransformStreamDefaultController) {
-                    if (chunk) {
-                        controller.enqueue(`0:${JSON.stringify(chunk)}\n`);
-                    }
-                },
-                flush(controller: TransformStreamDefaultController) {
-                    // Send metadata as data chunk 'd:'
-                    controller.enqueue(`d:${JSON.stringify(metadata)}\n`);
-                }
-            })
-        );
-
-        return new Response(prefixedStream, {
-            headers: {
-                "Content-Type": "text/plain; charset=utf-8",
-                "x-vercel-ai-data-stream": "v1"
-            }
+        // Use toDataStreamResponse if available in the installed version, 
+        // otherwise use toTextStreamResponse which is more common in v3.
+        // The lint error specifically suggested toDataStreamResponse might be missing.
+        return result.toTextStreamResponse({
+             headers: {
+                 'x-vercel-ai-data-stream': 'v1',
+             }
         });
 
     } catch (error: unknown) {

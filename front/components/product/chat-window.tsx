@@ -306,15 +306,30 @@ export function ChatWindow({
                     if (done) break;
                     
                     const chunk = decoder.decode(value);
+                    // Standard Vercel AI Stream Protocol Parser (Resilient)
                     const lines = chunk.split("\n").filter(l => l.trim());
                     
                     for (const line of lines) {
                         try {
-                            if (line.startsWith('0:')) { // Text chunk
-                                const textPart = JSON.parse(line.substring(2));
+                            let textPart = "";
+                            if (line.startsWith('0:')) { // Standard Text Block
+                                textPart = JSON.parse(line.substring(2));
+                            } else if (line.startsWith('d:')) { // Metadata Block
+                                metadata = JSON.parse(line.substring(2));
+                                continue;
+                            } else {
+                                // Fallback for raw text streams (if no prefix)
+                                try {
+                                    textPart = JSON.parse(line);
+                                } catch {
+                                    textPart = line;
+                                }
+                            }
+
+                            if (textPart) {
                                 fullText += textPart;
                                 
-                                // Live parsing for structured answers (Level: Tecnica)
+                                // Live parsing for structured answers
                                 let displayContent: string | StructuredAnswer = fullText;
                                 if (fullText.trim().startsWith('{')) {
                                     try {
@@ -322,22 +337,17 @@ export function ChatWindow({
                                         if (result.value && typeof result.value === 'object') {
                                             displayContent = result.value as unknown as StructuredAnswer;
                                         }
-                                    } catch {
-                                        // Still a raw string while parsing fails
-                                    }
+                                    } catch { }
                                 }
 
-                                // Update message in UI
                                 setMessages(prev => prev.map(m => 
                                     m.id === assistantMessageId 
                                         ? { ...m, content: displayContent } 
                                         : m
                                 ));
-                            } else if (line.startsWith('d:')) { // Data chunk (metadata)
-                                metadata = JSON.parse(line.substring(2));
                             }
                         } catch (error) {
-                            console.warn("Error parsing stream line:", line, error);
+                            console.warn("Error parsing stream chunk:", error);
                         }
                     }
                 }

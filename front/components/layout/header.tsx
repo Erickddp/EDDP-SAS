@@ -66,37 +66,39 @@ export function Header({ user, forceGuestView = false, hasSession = false }: Hea
                             <ThemeToggle />
                             {showAuthenticatedActions ? (
                                 <div className="flex items-center gap-4 ml-4">
-                                    <span className="text-sm text-text-sec">
-                                        {user?.role === 'guest' 
-                                            ? `Invitado (${user.questionCount || 0}/2)` 
-                                            : user?.name}
-                                    </span>
-                                    <Link href="/account">
-                                        <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
-                                            Mi Cuenta
-                                        </Button>
-                                    </Link>
+                                    <div className="flex items-center gap-2">
+                                        {user?.avatarUrl && (
+                                            <img 
+                                                src={user.avatarUrl} 
+                                                alt={user.name || "Usuario"} 
+                                                className="h-8 w-8 rounded-full border border-border-glow object-cover shadow-sm bg-bg-sec" 
+                                            />
+                                        )}
+                                        <span className="text-sm font-semibold text-text-main hidden lg:inline-block">
+                                            {user?.name}
+                                        </span>
+                                    </div>
                                     <Link href="/chat">
-                                        <Button variant="outline" size="sm">
-                                            Ir al Chat
+                                        <Button variant="primary" size="sm" className="hidden sm:inline-flex bg-cyan-main text-bg-main hover:bg-cyan-glow transition-all shadow-lg shadow-cyan-main/20">
+                                            Ir a mis Chats
                                         </Button>
                                     </Link>
                                     <form action={logout}>
-                                        <Button variant="ghost" size="sm" type="submit" className="text-red-400 hover:text-red-300 hover:bg-red-950/30">
+                                        <Button variant="ghost" size="sm" type="submit" className="text-text-sec hover:text-red-400 hover:bg-red-950/20 transition-all">
                                             Salir
                                         </Button>
                                     </form>
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-2 ml-4">
+                                <div className="flex items-center gap-3 ml-4">
                                     <Link href={enterHref}>
-                                        <Button variant="ghost" size="sm">
-                                            Entrar
+                                        <Button variant="ghost" size="sm" className="text-text-sec hover:text-cyan-main">
+                                            Iniciar Sesión
                                         </Button>
                                     </Link>
                                     <Link href="/register">
-                                        <Button variant="outline" size="sm">
-                                            Registrarse
+                                        <Button variant="primary" size="sm" className="bg-cyan-main text-bg-main hover:bg-cyan-glow shadow-md shadow-cyan-main/10">
+                                            Regístrate
                                         </Button>
                                     </Link>
                                 </div>
@@ -118,7 +120,7 @@ export function Header({ user, forceGuestView = false, hasSession = false }: Hea
                 </Container>
             </header>
 
-            <MobileMenu isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} enterHref={enterHref} />
+            <MobileMenu isOpen={mobileMenuOpen} user={user} onClose={() => setMobileMenuOpen(false)} enterHref={enterHref} />
         </>
     );
 }

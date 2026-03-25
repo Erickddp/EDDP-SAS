@@ -7,11 +7,13 @@ import { Button } from "../ui/button";
 
 interface MobileMenuProps {
     isOpen: boolean;
+    user?: any;
     onClose: () => void;
     enterHref?: string;
 }
 
-export function MobileMenu({ isOpen, onClose, enterHref = "/login" }: MobileMenuProps) {
+export function MobileMenu({ isOpen, user, onClose, enterHref = "/login" }: MobileMenuProps) {
+    const hasSession = Boolean(user);
     return (
         <AnimatePresence>
             {isOpen && (
@@ -72,11 +74,19 @@ export function MobileMenu({ isOpen, onClose, enterHref = "/login" }: MobileMenu
                                 Mi Cuenta
                             </Link>
                             <div className="h-px w-full bg-border-glow" />
-                            <Link href={enterHref} onClick={onClose}>
-                                <Button variant="primary" className="w-full">
-                                    Entrar
-                                </Button>
-                            </Link>
+                            {hasSession ? (
+                                <Link href="/chat" onClick={onClose}>
+                                    <Button variant="primary" className="w-full bg-cyan-main text-bg-main">
+                                        Ir a mis Chats
+                                    </Button>
+                                </Link>
+                            ) : (
+                                <Link href={enterHref} onClick={onClose}>
+                                    <Button variant="primary" className="w-full bg-cyan-main text-bg-main">
+                                        Iniciar Sesión
+                                    </Button>
+                                </Link>
+                            )}
                         </nav>
                     </motion.div>
                 </>
