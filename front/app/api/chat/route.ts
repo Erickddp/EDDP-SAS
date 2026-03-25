@@ -94,12 +94,23 @@ export async function POST(req: Request) {
         const { allowed, remaining, total } = await checkUsageLimit(userId, plan as PlanType, isGuest);
         
         if (!allowed) {
+            if (plan === "pro" || plan === "despacho") {
+                return NextResponse.json({ 
+                    error: "Límite de capacidad alcanzado", 
+                    code: "RATE_LIMIT_EXCEEDED",
+                    details: "Nuestros servidores están procesando alta demanda. Por favor, intenta de nuevo en unos minutos.",
+                    limitReached: true,
+                    total,
+                    remaining
+                }, { status: 429 });
+            }
+
             return NextResponse.json({ 
                 error: "Límite de consultas alcanzado", 
                 code: isGuest ? "GUEST_LIMIT_REACHED" : "USAGE_LIMIT_EXCEEDED",
                 details: isGuest 
                     ? `Has agotado tus ${GUEST_LIMIT} consultas como invitado. Regístrate gratis para obtener más.` 
-                    : `Has usado todas tus consultas (${total}) para tu plan ${plan}. Por favor, actualiza tu plan para continuar.`,
+                    : `Has usado todas tus consultas (${total}) diarias para tu plan ${plan}. Por favor, actualiza tu plan para continuar.`,
                 limitReached: true,
                 total,
                 remaining

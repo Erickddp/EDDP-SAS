@@ -9,7 +9,7 @@ export interface PlanLimits {
 
 export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     gratis: {
-        maxQueriesPerMonth: 10,
+        maxQueriesPerMonth: 3, // Actually daily limit with the new date_trunc('day')
         canExport: false,
         canUseAdvancedRAG: false,
         multiUser: false,
@@ -21,7 +21,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
         multiUser: false,
     },
     pro: {
-        maxQueriesPerMonth: 500, // Effectively "unlimited" for individual use
+        maxQueriesPerMonth: 150, // High capacity daily rate limit
         canExport: true,
         canUseAdvancedRAG: true,
         multiUser: false,

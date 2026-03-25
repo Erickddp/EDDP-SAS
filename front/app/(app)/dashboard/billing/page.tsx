@@ -45,6 +45,7 @@ export default function BillingPage() {
             if (data.url) window.location.href = data.url;
         } catch (err: any) {
             setError(err.message || "Error al iniciar el pago");
+        } finally {
             setActionLoading(false);
         }
     };
@@ -59,6 +60,7 @@ export default function BillingPage() {
             if (data.url) window.location.href = data.url;
         } catch (err: any) {
             setError(err.message || "Error al abrir el portal");
+        } finally {
             setActionLoading(false);
         }
     };
@@ -83,6 +85,9 @@ export default function BillingPage() {
                 <div>
                     <h1 className="text-3xl font-bold text-text-main">Facturación y Plan</h1>
                     <p className="mt-2 text-text-sec">Administra tu suscripción y límites de uso.</p>
+                    <p className="mt-4 text-sm font-medium text-blue-600 dark:text-cyan-main border-l-2 border-blue-600 dark:border-cyan-main pl-3">
+                        El Nivel Pro no es un gasto, es tu brazo derecho fiscal. Convierte horas de investigación normativa en respuestas ejecutables en segundos, respaldado por encriptación de grado bancario (Stripe) para proteger tu privacidad operativa.
+                    </p>
                 </div>
 
                 {error && (
@@ -146,24 +151,26 @@ export default function BillingPage() {
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-400">
                                     <CheckCircle2 className="h-5 w-5" />
                                 </div>
-                                <h2 className="text-xl font-semibold text-text-main">Uso Mensual</h2>
+                                <h2 className="text-xl font-semibold text-text-main">Uso Diario</h2>
                             </div>
 
                             <div className="mt-6 space-y-2">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-text-sec font-medium">Consultas realizadas</span>
                                     <span className="font-bold text-text-main">
-                                        {status?.usage?.current || 0} / {isPro ? "Ilimitado" : status?.usage?.total || 10}
+                                        {status?.usage?.current || 0} / {isPro ? "Alta Capacidad" : status?.usage?.total || 3}
                                     </span>
                                 </div>
-                                <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-bg-main shadow-inner">
-                                    <div 
-                                        className="h-full rounded-full bg-gradient-to-r from-cyan-main to-purple-500 transition-all duration-500"
-                                        style={{ width: isPro ? "100%" : `${Math.min(100, ((status?.usage?.current || 0) / (status?.usage?.total || 1)) * 100)}%` }}
-                                    />
-                                </div>
+                                {!isPro && (
+                                    <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-bg-main shadow-inner">
+                                        <div 
+                                            className="h-full rounded-full bg-gradient-to-r from-cyan-main to-purple-500 transition-all duration-500"
+                                            style={{ width: `${Math.min(100, ((status?.usage?.current || 0) / (status?.usage?.total || 1)) * 100)}%` }}
+                                        />
+                                    </div>
+                                )}
                                 <p className="text-xs text-text-sec text-right font-medium">
-                                    {isPro ? "Consultas Ilimitadas" : `${status?.usage?.remaining || 0} consultas restantes`}
+                                    {isPro ? "Consultas de Alta Capacidad" : `${status?.usage?.remaining || 0} consultas diarias restantes`}
                                 </p>
                             </div>
                         </div>

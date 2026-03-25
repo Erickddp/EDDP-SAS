@@ -39,11 +39,11 @@ export async function incrementUsage(userId: string | undefined): Promise<void> 
              ON CONFLICT (user_id) 
              DO UPDATE SET current_month_count = user_usage_counters.current_month_count + 1,
                            last_reset_date = CASE 
-                             WHEN user_usage_counters.last_reset_date < date_trunc('month', NOW()) THEN NOW()
+                             WHEN user_usage_counters.last_reset_date < date_trunc('day', NOW()) THEN NOW()
                              ELSE user_usage_counters.last_reset_date
                            END,
                            current_month_count = CASE
-                             WHEN user_usage_counters.last_reset_date < date_trunc('month', NOW()) THEN 1
+                             WHEN user_usage_counters.last_reset_date < date_trunc('day', NOW()) THEN 1
                              ELSE user_usage_counters.current_month_count + 1
                            END`,
             [userId]
