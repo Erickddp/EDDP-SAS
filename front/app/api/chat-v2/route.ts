@@ -136,15 +136,16 @@ export async function POST(req: Request) {
             messages: [
                 {
                     role: "system", 
-                    content: `Eres MyFiscal Orchestrator V2. Eres un experto fiscal mexicano con acceso a herramientas.
-Perfil del usuario: ${userProfile}.
+                    content: `Eres un estratega fiscal. Perfil del usuario: ${userProfile}.
 
-# INSTRUCCIONES ESTRICTAS:
-1. Analiza la consulta del usuario.
-2. Si es una duda muy general, un saludo o cortesía, USA la herramienta 'Respuesta_Basica'.
-3. Si la consulta involucra cálculos, fechas, deducciones, ISR, IVA, IMSS, multas o CUALQUIER interpretación de la ley, USA PRIMERO la herramienta 'Busqueda_Fiscal_Profunda' para buscar en la base de datos de MyFiscal.
-4. NUNCA inventes artículos de ley.
-5. Al finalizar tu análisis y respuesta de la duda, DEBES responder en formato JSON puro respetando la estructura 'StructuredAnswer' (que incluye sumario, explicacion detallada, etc.).`
+REGLAS DE ORQUESTACIÓN ESTRICTA:
+1. Si el usuario saluda o hace preguntas no legales, responde de manera cortés y directa SIN usar herramientas de búsqueda.
+2. Usa la herramienta 'Busqueda_Fiscal_Profunda' ÚNICAMENTE si la consulta requiere análisis normativo, cálculo de impuestos o defensa legal.
+3. TU RESPUESTA FINAL SIEMPRE DEBE SER UN OBJETO JSON VÁLIDO QUE CUMPLA CON LA ESTRUCTURA 'StructuredAnswer' (incluyendo summary, foundation, scenarios, etc.). No devuelvas texto plano, incluso para saludos.
+
+Ejemplo simple de saludo:
+{"summary": "Hola, soy MyFiscal. ¿En qué te puedo ayudar hoy con tus temas fiscales?", "foundation": [], "scenarios": [], "consequences": [], "certainty": "Sistema", "disclaimer": ""}
+`
                 },
                 ...((body.history || []).map((m: any) => ({ role: m.role, content: m.content }))),
                 {
@@ -153,16 +154,6 @@ Perfil del usuario: ${userProfile}.
                 }
             ],
             tools: {
-                Respuesta_Basica: tool({
-                    description: 'Redacta un saludo, despedida, o clarificación general básica a una pregunta que no requiere buscar en las leyes de MyFiscal.',
-                    parameters: z.object({
-                        respuesta_corta: z.string().describe('Respuesta sugerida.'),
-                    }),
-                    // @ts-ignore
-                    execute: async (args: any) => {
-                        return { resultado: "Entendido, no usaré herramientas avanzadas.", contexto: args.respuesta_corta };
-                    },
-                }),
                 Busqueda_Fiscal_Profunda: tool({
                     description: 'Realiza una búsqueda profunda en la base de datos de jurisprudencia y leyes de MyFiscal para resolver dudas fiscales, contables, cálculos o deducciones.',
                     parameters: z.object({
@@ -206,7 +197,8 @@ Perfil del usuario: ${userProfile}.
                     }
                 })
             },
-            // maxSteps omitted for type compatibility
+            // @ts-ignore: maxSteps might not be in the type definition but works at runtime
+            maxSteps: 3,
             onFinish: async (completion) => {
                 try {
                     const finishTime = Date.now();

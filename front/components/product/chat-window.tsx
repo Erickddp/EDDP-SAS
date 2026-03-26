@@ -369,15 +369,23 @@ export function ChatWindow({
                 }
             }
 
-            // Final message processing
+            // Final message processing: try a strict parse first, then a more flexible one if it looks like JSON
             let finalContent: string | StructuredAnswer = fullText;
-            try {
-                // Check if fullText is a JSON string (for StructuredAnswer)
-                if (fullText.trim().startsWith('{')) {
-                    finalContent = JSON.parse(fullText);
+            const trimmed = fullText.trim();
+            if (trimmed.startsWith('{')) {
+                try {
+                    finalContent = JSON.parse(trimmed);
+                } catch {
+                    // If strict parse fails, try extracting just the JSON block
+                    const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        try {
+                            finalContent = JSON.parse(jsonMatch[0]);
+                        } catch {
+                            console.warn("Could not parse extracted JSON block:", jsonMatch[0]);
+                        }
+                    }
                 }
-            } catch {
-                console.warn("Final text was not JSON:", fullText);
             }
 
             const updatedAssistantMessage: Message = {
@@ -658,7 +666,7 @@ export function ChatWindow({
                 </div>
             </main>
 
-            <div className="flex-none border-t border-border-glow/60 bg-bg-main/90 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur-xl md:px-6 md:py-5">
+            <div className="flex-none border-t border-border-glow/60 bg-bg-main/90 px-3 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] pt-2 backdrop-blur-xl md:px-6 md:py-5">
                 <div className="relative mx-auto max-w-4xl">
                     <ChatControls 
                         mode={mode} 

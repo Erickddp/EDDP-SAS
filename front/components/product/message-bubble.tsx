@@ -91,6 +91,23 @@ function normalizeStructured(answer: StructuredAnswer) {
     };
 }
 
+function tryParseStructuredAnswer(content: any): StructuredAnswer | null {
+    if (typeof content !== "string") return null;
+    const trimmed = content.trim();
+    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return null;
+
+    try {
+        const parsed = JSON.parse(trimmed);
+        // Validar que tenga campos mínimos de StructuredAnswer
+        if (parsed && typeof parsed === "object" && ("summary" in parsed || "primaryBasis" in parsed)) {
+            return parsed as StructuredAnswer;
+        }
+    } catch {
+        // No es un JSON válido, ignorar
+    }
+    return null;
+}
+
 export function MessageBubble({
     role,
     content,
@@ -175,20 +192,44 @@ export function MessageBubble({
                                 : "bg-bg-sec border border-border-glow text-text-main rounded-tr-sm shadow-sm"
                         )}
                     >
-                        {typeof content === "string" ? (
-                            <div className="space-y-4">
-                                <p>{content}</p>
-                                {!isUser && <MessageActions content={content} onRegenerate={onRegenerate} />}
-                            </div>
-                        ) : (
-                            <StructuredResponseView
-                                answer={content}
-                                sources={sources}
-                                onOpenArticle={onOpenArticle}
-                                onRegenerate={onRegenerate}
-                                onAction={onAction}
-                            />
-                        )}
+                        {(() => {
+                            // Si es un objeto, lo usamos directamente
+                            if (typeof content !== "string") {
+                                return (
+                                    <StructuredResponseView
+                                        answer={content}
+                                        sources={sources}
+                                        onOpenArticle={onOpenArticle}
+                                        onRegenerate={onRegenerate}
+                                        onAction={onAction}
+                                    />
+                                );
+                            }
+
+                            // Si es un string, intentamos parsearlo como StructuredAnswer
+                            const parsed = tryParseStructuredAnswer(content);
+                            if (parsed) {
+                                return (
+                                    <StructuredResponseView
+                                        answer={parsed}
+                                        sources={sources}
+                                        onOpenArticle={onOpenArticle}
+                                        onRegenerate={onRegenerate}
+                                        onAction={onAction}
+                                    />
+                                );
+                            }
+
+                            // Fallback: Texto plano / Markdown básico
+                            return (
+                                <div className="space-y-4">
+                                    <div className="text-[15px] leading-relaxed whitespace-pre-line text-text-main">
+                                        {content}
+                                    </div>
+                                    {!isUser && <MessageActions content={content} onRegenerate={onRegenerate} />}
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             </div>
