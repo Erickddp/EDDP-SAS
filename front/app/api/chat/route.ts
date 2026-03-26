@@ -247,7 +247,7 @@ export async function POST(req: Request) {
         // ──────────────────────────────────────────────────────────────────
         // 1. Query Analysis — classify complexity and get config + debug
         // ──────────────────────────────────────────────────────────────────
-        const { analysis: queryAnalysis, debug: queryDebug } = analyzeQueryWithDebug(effectiveQuery, body.mode, body.detailLevel);
+        const { analysis: queryAnalysis, debug: queryDebug } = analyzeQueryWithDebug(effectiveQuery, body.mode, body.detailLevel || 'sencilla');
         const tierConfig = RETRIEVAL_CONFIG[queryAnalysis.complexity];
 
         // Ensure token limit supports maxWords requested by depth rule
@@ -480,7 +480,7 @@ export async function POST(req: Request) {
                     content: buildSystemPrompt({
                         message: body.message,
                         mode: body.mode,
-                        detailLevel: body.detailLevel,
+                        detailLevel: body.detailLevel || 'sencilla',
                         topic: context.topic,
                         legalContext: context.retrievedArticles,
                         history: body.history,
@@ -497,7 +497,7 @@ export async function POST(req: Request) {
                     content: buildUserPrompt({
                         message: body.message,
                         mode: body.mode,
-                        detailLevel: body.detailLevel,
+                        detailLevel: body.detailLevel || 'sencilla',
                         topic: context.topic,
                         legalContext: context.retrievedArticles,
                         history: body.history,
@@ -548,7 +548,7 @@ export async function POST(req: Request) {
                             id: body.conversationId,
                             title: (body.history?.length === 0) ? (titleSuggestion as string) : "Consulta Fiscal",
                             mode: body.mode,
-                            detailLevel: body.detailLevel,
+                            detailLevel: body.detailLevel || 'sencilla',
                             archived: false,
                             createdAt: Date.now(),
                             updatedAt: Date.now(),

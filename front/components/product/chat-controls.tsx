@@ -14,30 +14,20 @@ import { ChatMode, DetailLevel } from "@/lib/types";
 
 interface ChatControlsProps {
     mode: ChatMode;
-    detail: DetailLevel;
     onModeChange: (mode: ChatMode) => void;
-    onDetailChange: (level: DetailLevel) => void;
 }
 
 export function ChatControls({
     mode,
-    detail,
-    onModeChange,
-    onDetailChange
+    onModeChange
 }: ChatControlsProps) {
     const modes: { id: ChatMode; label: string; icon: LucideIcon }[] = [
         { id: "casual", label: "Casual", icon: Smile },
         { id: "profesional", label: "Profesional", icon: Scale },
     ];
 
-    const details: { id: DetailLevel; label: string; icon: LucideIcon }[] = [
-        { id: "sencilla", label: "Sencilla", icon: Circle },
-        { id: "detallada", label: "Detallada", icon: MoreHorizontal },
-        { id: "tecnica", label: "Tecnica", icon: Layers },
-    ];
-
     return (
-        <div className="mb-2.5 grid gap-1.5 md:flex md:items-stretch md:gap-2.5">
+        <div className="mb-2.5 flex items-stretch max-w-[fit-content]">
             <ControlGroup label="Tono" icon={Type}>
                 <div className="grid grid-cols-2 gap-1">
                     {modes.map((m) => (
@@ -48,21 +38,6 @@ export function ChatControls({
                             icon={m.icon}
                             label={m.label}
                             tooltip={`Modo ${m.label}`}
-                        />
-                    ))}
-                </div>
-            </ControlGroup>
-
-            <ControlGroup label="Nivel" icon={Layers}>
-                <div className="grid grid-cols-3 gap-1">
-                    {details.map((d) => (
-                        <OptionButton
-                            key={d.id}
-                            isSelected={detail === d.id}
-                            onClick={() => onDetailChange(d.id)}
-                            icon={d.icon}
-                            label={d.label}
-                            tooltip={`Respuesta ${d.label}`}
                         />
                     ))}
                 </div>

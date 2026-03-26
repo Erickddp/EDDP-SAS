@@ -58,3 +58,15 @@ export const messages = pgTable("messages", {
         conversationIdIndex: index("conversation_id_idx").on(table.conversationId),
     };
 });
+
+export const userMemories = pgTable("user_memories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: 'cascade' }),
+  factText: text("fact_text").notNull(),
+  embedding: text("embedding"), // Store as text for now or vector if extension is enabled
+  timestamp: timestamp("timestamp").defaultNow(),
+}, (table) => {
+    return {
+        userIdIndex: index("user_memories_user_id_idx").on(table.userId),
+    };
+});

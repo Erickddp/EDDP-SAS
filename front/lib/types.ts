@@ -141,7 +141,7 @@ export interface Conversation {
     id: string;
     title: string;
     mode: ChatMode;
-    detailLevel: DetailLevel;
+    detailLevel?: DetailLevel;
     archived?: boolean;
     tags?: string[];
     createdAt: number;
@@ -150,7 +150,7 @@ export interface Conversation {
 
 export interface UserPreferences {
     lastMode: ChatMode;
-    lastDetailLevel: DetailLevel;
+    lastDetailLevel?: DetailLevel;
 }
 
 export interface ChatUserProfile {
@@ -168,8 +168,13 @@ export interface ChatRequest {
     message: string;
     userId?: string; // Phase 7: Explicit ID for testing/recovery
     mode: ChatMode;
-    detailLevel: DetailLevel;
+    detailLevel?: DetailLevel;
     history?: HistoryMessage[];
+    attachments?: Array<{
+        url: string;
+        name: string;
+        contentType: string;
+    }>;
 }
 
 

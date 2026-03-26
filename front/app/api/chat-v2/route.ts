@@ -21,6 +21,7 @@ import { saveConversation, saveMessage as saveChatMsg } from "@/lib/chat-storage
 import { isRateLimited } from "@/lib/cache-manager";
 import { detectFollowUp, getConversationContext, updateConversationContext } from "@/lib/conversation-context";
 import { getCachedResponse } from "@/lib/cache-manager";
+import { extractAndStoreMemories, getRelevantMemoriesForPrompt } from "@/lib/memory-graph";
 
 export async function POST(req: Request) {
     const methodError = validatedMethod(req, ["POST"]);
@@ -126,9 +127,24 @@ export async function POST(req: Request) {
             return handleApiError(new Error("API Key faltante"), AppErrorType.OPENAI);
         }
 
+        const relevantMemories = await getRelevantMemoriesForPrompt(userId);
+
+        // Proceso asíncrono paralelo: Extracción de hechos (Memoria Graph)
+        // No bloqueamos el camino crítico de la respuesta.
+        if (userId && !isGuest) {
+            extractAndStoreMemories(userId, body.message).catch(err => console.error("Memory Extraction Error:", err));
+        }
+
         let globalSources: any[] = [];
         let globalTags: string[] = ["General V2"];
         let toolTokens = 0;
+
+        // The Orchestrator core
+        const mode = body.mode || 'Profesional';
+        const detailLevel = body.detailLevel || 'Sencilla';
+
+        // Standardizing attachments for Multimodal Vision (Vercel AI SDK style)
+        const attachments = (body as any).attachments || [];
 
         // The Orchestrator core
         const result = streamText({
@@ -136,24 +152,66 @@ export async function POST(req: Request) {
             messages: [
                 {
                     role: "system", 
-                    content: `Eres un estratega fiscal. Perfil del usuario: ${userProfile}.
+                    content: `Eres MyFiscal, un estratega y asesor fiscal, legal y contable para empresas y personas en México.
+Perfil del usuario: ${userProfile}.
+Tono de la conversación (Mode): ${mode}.
+Nivel de detalle requerido: ${detailLevel}.
+${relevantMemories ? `\nMEMORIA HISTÓRICA RELEVANTE:\n${relevantMemories}\n` : ""}
 
-REGLAS DE ORQUESTACIÓN ESTRICTA:
-1. Si el usuario saluda o hace preguntas no legales, responde de manera cortés y directa SIN usar herramientas de búsqueda.
-2. Usa la herramienta 'Busqueda_Fiscal_Profunda' ÚNICAMENTE si la consulta requiere análisis normativo, cálculo de impuestos o defensa legal.
-3. TU RESPUESTA FINAL SIEMPRE DEBE SER UN OBJETO JSON VÁLIDO QUE CUMPLA CON LA ESTRUCTURA 'StructuredAnswer' (incluyendo summary, foundation, scenarios, etc.). No devuelvas texto plano, incluso para saludos.
+INSTRUCCIONES DE RESPUESTA:
+Evalúa la consulta del usuario y DEBES usar obligatoriamente UNA y SÓLO UNA de las herramientas de "Respuesta Final" (Responder_Charla o Analisis_Juridico_Estructurado).
 
-Ejemplo simple de saludo:
-{"summary": "Hola, soy MyFiscal. ¿En qué te puedo ayudar hoy con tus temas fiscales?", "foundation": [], "scenarios": [], "consequences": [], "certainty": "Sistema", "disclaimer": ""}
-`
+NUEVA CAPACIDAD MULTIMODAL:
+- Si el usuario adjunta un documento o imagen (constancia de situación fiscal, recibo, factura, etc.), utiliza la herramienta 'Analisis_Documento_SAT' ANTES de emitir tu dictamen para extraer su contenido.
+- Puedes combinar herramientas: primero 'Analisis_Documento_SAT' y luego 'Analisis_Juridico_Estructurado' para dar tu veredicto final.
+
+HERRAMIENTAS DE RESPUESTA FINAL:
+- Usa la herramienta 'Responder_Charla' si el usuario te saluda, hace preguntas generales, o si el nivel es Sencilla/Casual.
+- Usa la herramienta 'Analisis_Juridico_Estructurado' si la consulta es de naturaleza técnica y requiere análisis estructurado JSON.`
                 },
                 ...((body.history || []).map((m: any) => ({ role: m.role, content: m.content }))),
                 {
                     role: "user",
-                    content: effectiveQuery
+                    content: attachments.length > 0 
+                        ? [
+                            { type: 'text', text: effectiveQuery },
+                            ...attachments.map((a: any) => ({
+                                type: 'image', // Adjusting for vision-compatible models
+                                image: a.url
+                            }))
+                          ]
+                        : effectiveQuery
                 }
             ],
             tools: {
+                Responder_Charla: tool({
+                    description: 'DEBES llamar a esta herramienta SI Y SÓLO SI la intención del usuario es un saludo, una charla casual, o una consulta general que no requiere análisis legal/fiscal. Úsala también si el nivel de detalle requerido es "Sencilla" o "Casual".',
+                    parameters: z.object({
+                        respuesta: z.string().describe('Tu respuesta conversacional y directa en texto plano.')
+                    }),
+                    // @ts-ignore
+                    execute: async (args: any) => { return args; }
+                }),
+                Analisis_Juridico_Estructurado: tool({
+                    description: 'DEBES llamar a esta herramienta SI Y SÓLO SI la consulta es técnica, legal, fiscal o contable y requiere una respuesta estructurada.',
+                    parameters: z.object({
+                        summary: z.string().describe('Resumen ejecutivo de tu análisis en texto plano.'),
+                        foundation: z.array(z.object({
+                            title: z.string().describe('Nombre de la Ley/Artículo.'),
+                            content: z.string().describe('Fragmento resumido o explicación.')
+                        })).describe('Fundamentos legales que sustentan tu respuesta.'),
+                        scenarios: z.array(z.object({
+                            title: z.string().describe('Caso de Uso o Escenario.'),
+                            description: z.string().describe('Descripción de lo que ocurre en este escenario.'),
+                            likelihood: z.string().describe('Probabilidad: Alta, Media o Baja.')
+                        })).describe('Diferentes escenarios aplicables.'),
+                        consequences: z.array(z.string()).describe('Consecuencias legales, fiscales o multas.'),
+                        certainty: z.string().describe('Nivel de certeza de tu análisis: Alta, Media, Baja.'),
+                        disclaimer: z.string().describe('Nota legal aclaratoria.')
+                    }),
+                    // @ts-ignore
+                    execute: async (args: any) => { return args; }
+                }),
                 Busqueda_Fiscal_Profunda: tool({
                     description: 'Realiza una búsqueda profunda en la base de datos de jurisprudencia y leyes de MyFiscal para resolver dudas fiscales, contables, cálculos o deducciones.',
                     parameters: z.object({
@@ -164,7 +222,7 @@ Ejemplo simple de saludo:
                         const query = args.query;
                         console.log("🛠️ [AGENT TOOL V2] Busqueda_Fiscal_Profunda ejecutándose para ->", query);
                         const parsedRef = parseLegalReference(query);
-                        const { analysis } = analyzeQueryWithDebug(query, body.mode, body.detailLevel);
+                        const { analysis } = analyzeQueryWithDebug(query, body.mode, body.detailLevel || 'sencilla');
                         const rPlan = buildRetrievalPlan(analysis, followUpResult.isFollowUp, false, 5, previousContext);
                         
                         const context = await buildLegalContext(
@@ -195,6 +253,25 @@ Ejemplo simple de saludo:
                             }))
                         };
                     }
+                }),
+                Analisis_Documento_SAT: tool({
+                    description: 'Utiliza esta herramienta SI Y SÓLO SI el usuario ha adjuntado una imagen o documento (PDF, constancia, recibo) y solicita su revisión.',
+                    parameters: z.object({
+                        fileUrl: z.string().describe('URL o base64 del archivo a analizar.'),
+                        analysisType: z.string().describe('Tipo de análisis: OCR, Validación RFC, Revisión de Recibo.')
+                    }),
+                    // @ts-ignore
+                    execute: async (args: any) => {
+                        console.log("🛠️ [AGENT TOOL V2] Analisis_Documento_SAT (MOCK) ejecutándose.");
+                        return {
+                            resultado: "Documento procesado exitosamente (MODO SIMULACIÓN). Aquí iría el procesamiento multimodal de GPT-4o Vision.",
+                            datos_extraidos: {
+                                rfc_emisor: "XAXX010101000",
+                                monto_total: 1500.50,
+                                regimen: "Suplementario"
+                            }
+                        };
+                    }
                 })
             },
             // @ts-ignore: maxSteps might not be in the type definition but works at runtime
@@ -219,8 +296,20 @@ Ejemplo simple de saludo:
                             archived: false, createdAt: Date.now(), updatedAt: Date.now(), tags: globalTags
                         });
                         
+                        let finalContent = completion.text || "";
+                        const pCompleted = completion as any;
+                        if (pCompleted.toolCalls && pCompleted.toolCalls.length > 0) {
+                            const analysisTool = pCompleted.toolCalls.find((t: any) => t.toolName === 'Analisis_Juridico_Estructurado');
+                            const charlaTool = pCompleted.toolCalls.find((t: any) => t.toolName === 'Responder_Charla');
+                            if (analysisTool) {
+                                finalContent = JSON.stringify(analysisTool.args);
+                            } else if (charlaTool) {
+                                finalContent = charlaTool.args.respuesta;
+                            }
+                        }
+                        
                         await saveChatMsg({ id: `user-${Date.now()}`, conversationId: body.conversationId, role: "user", content: body.message, createdAt: Date.now() });
-                        await saveChatMsg({ id: `assistant-${Date.now()}`, conversationId: body.conversationId, role: "assistant", content: completion.text, sources: globalSources, createdAt: Date.now() });
+                        await saveChatMsg({ id: `assistant-${Date.now()}`, conversationId: body.conversationId, role: "assistant", content: finalContent, sources: globalSources, createdAt: Date.now() });
                     }
                 } catch (e) {
                     console.error("[V2] Error onFinish", e);

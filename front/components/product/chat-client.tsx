@@ -127,14 +127,14 @@ export function ChatClient({ initialSession }: ChatClientProps) {
         // but manual updates from UI (if implemented) would need a remote PATCH as well.
     };
 
-    const handlePrefsChange = (mode: ChatMode, level: DetailLevel) => {
-        const newPrefs = { lastMode: mode, lastDetailLevel: level };
+    const handlePrefsChange = (mode: ChatMode) => {
+        const newPrefs = { lastMode: mode, lastDetailLevel: prefs.lastDetailLevel };
         setPrefs(newPrefs);
         Storage.savePreferences(newPrefs);
 
         if (activeId) {
             const updated = conversations.map(c =>
-                c.id === activeId ? { ...c, mode, detailLevel: level, updatedAt: Date.now() } : c
+                c.id === activeId ? { ...c, mode, updatedAt: Date.now() } : c
             );
             setConversations(updated);
             Storage.saveConversations(updated);
@@ -258,7 +258,6 @@ export function ChatClient({ initialSession }: ChatClientProps) {
                     onUpdateMetadata={handleUpdateMetadata}
                     onNewConversation={handleNewConversation}
                     initialMode={prefs.lastMode}
-                    initialDetailLevel={prefs.lastDetailLevel}
                     onPrefsChange={handlePrefsChange}
                     onFirstMessage={() => setSidebarOpen(false)}
                     conversationTitle={activeId ? conversations.find(c => c.id === activeId)?.title : undefined}

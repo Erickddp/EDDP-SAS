@@ -22,8 +22,7 @@ interface ChatWindowProps {
     onUpdateMetadata: (title?: string, tags?: string[]) => void;
     onNewConversation: () => void;
     initialMode: ChatMode;
-    initialDetailLevel: DetailLevel;
-    onPrefsChange: (mode: ChatMode, level: DetailLevel) => void;
+    onPrefsChange: (mode: ChatMode) => void;
     onFirstMessage?: () => void;
     conversationTitle?: string;
     conversationTags?: string[];
@@ -60,7 +59,6 @@ export function ChatWindow({
     onUpdateMetadata,
     onNewConversation,
     initialMode,
-    initialDetailLevel,
     onPrefsChange,
     onFirstMessage,
     conversationTitle,
@@ -71,7 +69,6 @@ export function ChatWindow({
     isSidebarOpen = true,
 }: ChatWindowProps) {
     const [mode, setMode] = useState<ChatMode>(initialMode);
-    const [detail, setDetail] = useState<DetailLevel>(initialDetailLevel);
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState("");
     const [isTyping, setIsTyping] = useState(false);
@@ -89,11 +86,9 @@ export function ChatWindow({
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Sync internal state with props
     useEffect(() => {
         setMode(initialMode);
-        setDetail(initialDetailLevel);
-    }, [initialMode, initialDetailLevel]);
+    }, [initialMode]);
 
     // Load messages when conversationId changes
     useEffect(() => {
@@ -177,12 +172,7 @@ export function ChatWindow({
 
     const handleModeChange = (newMode: ChatMode) => {
         setMode(newMode);
-        onPrefsChange(newMode, detail);
-    };
-
-    const handleDetailChange = (newLevel: DetailLevel) => {
-        setDetail(newLevel);
-        onPrefsChange(mode, newLevel);
+        onPrefsChange(newMode);
     };
 
     const sendMessage = async (text: string, isRegenerate = false) => {
@@ -219,14 +209,13 @@ export function ChatWindow({
         }));
 
         try {
-            const response = await fetch("/api/chat", {
+            const response = await fetch("/api/chat-v2", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     conversationId: targetConvId,
                     message: text,
                     mode,
-                    detailLevel: detail,
                     history
                 })
             });
@@ -670,9 +659,7 @@ export function ChatWindow({
                 <div className="relative mx-auto max-w-4xl">
                     <ChatControls 
                         mode={mode} 
-                        detail={detail} 
                         onModeChange={handleModeChange} 
-                        onDetailChange={handleDetailChange} 
                     />
                     <div className="relative flex items-end overflow-hidden rounded-2xl border border-border-glow bg-bg-sec/92 p-1.5 shadow-xl backdrop-blur-xl transition-all focus-within:border-cyan-main/40">
                         <textarea

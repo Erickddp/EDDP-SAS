@@ -258,3 +258,32 @@ export async function updateUserPreferences(userId: string, data: Partial<UserPr
         [userId, ...values]
     );
 }
+
+export interface UserMemory {
+    id: string;
+    userId: string;
+    factText: string;
+    embedding?: string;
+    timestamp: Date;
+}
+
+export async function getUserMemories(userId: string): Promise<UserMemory[]> {
+    const { rows } = await query(
+        `SELECT * FROM user_memories WHERE user_id = $1 ORDER BY timestamp DESC`,
+        [userId]
+    );
+    return rows.map(r => ({
+        id: r.id,
+        userId: r.user_id,
+        factText: r.fact_text,
+        embedding: r.embedding,
+        timestamp: r.timestamp
+    }));
+}
+
+export async function saveUserMemory(userId: string, factText: string, embedding?: string): Promise<void> {
+    await query(
+        `INSERT INTO user_memories (user_id, fact_text, embedding) VALUES ($1, $2, $3)`,
+        [userId, factText, embedding || null]
+    );
+}
