@@ -127,7 +127,12 @@ export async function POST(req: Request) {
             return handleApiError(new Error("API Key faltante"), AppErrorType.OPENAI);
         }
 
-        const relevantMemories = await getRelevantMemoriesForPrompt(userId);
+        let relevantMemories = "";
+        try {
+            relevantMemories = await getRelevantMemoriesForPrompt(userId);
+        } catch (memError) {
+            console.error("⚠️ [MEMORY RETRIEVAL ERROR] Silencing for resilience:", memError);
+        }
 
         // Proceso asíncrono paralelo: Extracción de hechos (Memoria Graph)
         // No bloqueamos el camino crítico de la respuesta.
@@ -187,7 +192,7 @@ HERRAMIENTAS DE RESPUESTA FINAL:
                 Responder_Charla: tool({
                     description: 'DEBES llamar a esta herramienta SI Y SÓLO SI la intención del usuario es un saludo, una charla casual, o una consulta general que no requiere análisis legal/fiscal. Úsala también si el nivel de detalle requerido es "Sencilla" o "Casual".',
                     parameters: z.object({
-                        respuesta: z.string().describe('Tu respuesta conversacional y directa en texto plano.')
+                        mensaje: z.string().describe('La respuesta en texto plano conversacional y directa.')
                     }),
                     // @ts-ignore
                     execute: async (args: any) => { return args; }
@@ -304,7 +309,7 @@ HERRAMIENTAS DE RESPUESTA FINAL:
                             if (analysisTool) {
                                 finalContent = JSON.stringify(analysisTool.args);
                             } else if (charlaTool) {
-                                finalContent = charlaTool.args.respuesta;
+                                finalContent = charlaTool.args.mensaje;
                             }
                         }
                         
