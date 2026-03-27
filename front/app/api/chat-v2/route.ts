@@ -129,9 +129,12 @@ export async function POST(req: Request) {
 
         let relevantMemories = "";
         try {
-            relevantMemories = await getRelevantMemoriesForPrompt(userId);
+            // Force await and wrap in a clean block to prevent unhandled rejections
+            const rawMemories = await getRelevantMemoriesForPrompt(userId).catch(() => "");
+            relevantMemories = rawMemories || "";
         } catch (memError) {
-            console.error("⚠️ [MEMORY RETRIEVAL ERROR] Silencing for resilience:", memError);
+            console.error("⚠️ [MEMORY CRITICAL] SQL 42P01 or Connection Error. Proceeding without memory.");
+            relevantMemories = "";
         }
 
         // Proceso asíncrono paralelo: Extracción de hechos (Memoria Graph)
@@ -192,8 +195,8 @@ HERRAMIENTAS DE RESPUESTA FINAL:
                 Responder_Charla: tool({
                     description: 'DEBES llamar a esta herramienta SI Y SÓLO SI la intención del usuario es un saludo, una charla casual, o una consulta general que no requiere análisis legal/fiscal. Úsala también si el nivel de detalle requerido es "Sencilla" o "Casual".',
                     parameters: z.object({
-                        mensaje: z.string().describe('La respuesta en texto plano conversacional y directa.')
-                    }),
+                        respuesta: z.string().describe('Tu respuesta al usuario')
+                    }).strict(),
                     // @ts-ignore
                     execute: async (args: any) => { return args; }
                 }),
@@ -309,7 +312,7 @@ HERRAMIENTAS DE RESPUESTA FINAL:
                             if (analysisTool) {
                                 finalContent = JSON.stringify(analysisTool.args);
                             } else if (charlaTool) {
-                                finalContent = charlaTool.args.mensaje;
+                                finalContent = charlaTool.args.respuesta;
                             }
                         }
                         
